@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    @apply bg-slate-50 text-slate-900 font-sans antialiased;
+  }
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-slate-300 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-400;
+  }
+}
+
+@layer components {
+  .sidebar-item {
+    @apply w-full flex items-center gap-3 px-5 py-2.5 text-left transition-all duration-150 border-l-[3px] border-transparent;
+  }
+  .sidebar-item.active {
+    @apply bg-slate-800 border-l-[3px];
+  }
+  .input-base {
+    @apply w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition-all;
+  }
+  .btn-primary {
+    @apply bg-blue-500 hover:bg-blue-600 text-white font-semibold text-sm px-4 py-2 rounded-lg transition-colors cursor-pointer border-none;
+  }
+  .btn-secondary {
+    @apply bg-white hover:bg-slate-50 text-slate-600 font-semibold text-sm px-4 py-2 rounded-lg transition-colors cursor-pointer border border-slate-200;
+  }
+  .btn-danger {
+    @apply bg-red-500 hover:bg-red-600 text-white font-semibold text-sm px-4 py-2 rounded-lg transition-colors cursor-pointer border-none;
+  }
+  .card {
+    @apply bg-white rounded-xl border border-slate-100 shadow-card;
+  }
+  .modal-overlay {
+    @apply fixed inset-0 bg-black/60 z-[1000] flex items-center justify-center p-4;
+  }
+  .modal-box {
+    @apply bg-white rounded-2xl shadow-modal w-full overflow-auto;
+  }
+  .tab-btn {
+    @apply border-none bg-transparent px-4 py-3.5 text-sm font-medium text-slate-500 cursor-pointer border-b-2 border-transparent transition-colors -mb-px;
+  }
+  .tab-btn.active {
+    @apply text-blue-500 border-b-blue-500 font-bold;
+  }
+  .badge {
+    @apply inline-flex items-center text-xs font-bold rounded-md px-2 py-0.5;
+  }
+  .section-title {
+    @apply text-[11px] font-bold text-slate-400 uppercase tracking-wide;
+  }
+  .field-label {
+    @apply block text-[11px] font-semibold text-slate-500 mb-1;
+  }
+}

@@ -1,12 +1,12 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useObras } from "@/hooks/useObras";
 import DashboardObras from "./DashboardObras";
 import AbaObras from "./AbaObras";
 import AbaMedicoes from "./AbaMedicoes";
 import ModalObra from "./ModalObra";
 import { SkeletonCard } from "@/components/ui/Skeleton";
-import type { Obra, Medicao } from "@/types/app.types";
+import type { Obra, Medicao, EtapaObra } from "@/types/app.types";
 
 type Aba = "dashboard" | "obras" | "medicoes";
 
@@ -72,9 +72,12 @@ export default function SetorObras() {
         <ModalObra
           obra={modalObra === "nova" ? null : modalObra}
           onClose={() => setModalObra(null)}
-          onSave={async (data) => { await salvar(data); setModalObra(null); }}
-          onAvancar={avancarEtapa}
-          onSalvarMedicao={salvarMedicao}
+          onSave={async (data) => { await salvar(data); }}
+          onAvancar={async (id: string, novaEtapa: EtapaObra) => {
+            const obraObj = obras.find((o) => o.id === id);
+            if (obraObj) await avancarEtapa(obraObj, novaEtapa);
+          }}
+          onSalvarMedicao={async (obraId, data) => { await salvarMedicao(obraId, data); }}
           onRemoverMedicao={removerMedicao}
         />
       )}
@@ -83,9 +86,12 @@ export default function SetorObras() {
         <ModalObra
           obra={editMedObj.obra}
           onClose={() => setEditMedObj(null)}
-          onSave={salvar}
-          onAvancar={avancarEtapa}
-          onSalvarMedicao={salvarMedicao}
+          onSave={async (data) => { await salvar(data); }}
+          onAvancar={async (id: string, novaEtapa: EtapaObra) => {
+            const obraObj = obras.find((o) => o.id === id);
+            if (obraObj) await avancarEtapa(obraObj, novaEtapa);
+          }}
+          onSalvarMedicao={async (obraId, data) => { await salvarMedicao(obraId, data); }}
           onRemoverMedicao={removerMedicao}
         />
       )}

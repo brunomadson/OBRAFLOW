@@ -148,7 +148,7 @@ export type Database = {
           pct_solicitada: number | null;
           pct_liberada: number | null;
           valor_liberado: number | null;
-          status: "a_solicitar" | "solicitada" | "realizada" | "laudo_emitido" | "pagamento";
+          status: "a_solicitar" | "solicitada" | "laudo_emitido" | "paga";
           data_envio_caixa: string | null;
           data_laudo: string | null;
           data_liberacao: string | null;

@@ -73,18 +73,16 @@ export const ENGENHEIROS = [
 
 export const STATUS_MEDICAO_LABEL: Record<string, string> = {
   a_solicitar:  "A Solicitar",
-  solicitada:   "Solicitada",
-  realizada:    "Realizada",
+  solicitada:   "Solicitado",
   laudo_emitido:"Laudo Emitido",
-  pagamento:    "Pagamento",
+  paga:         "Paga",
 };
 
 export const STATUS_MEDICAO_COR: Record<string, string> = {
   a_solicitar:  "#94A3B8",
   solicitada:   "#3B82F6",
-  realizada:    "#8B5CF6",
   laudo_emitido:"#F97316",
-  pagamento:    "#10B981",
+  paga:         "#10B981",
 };
 
 export const STATUS_ITEM_LABEL: Record<string, string> = {

@@ -38,7 +38,7 @@ export async function createObra(payload: Omit<Obra, "id" | "created_at" | "upda
 
 export async function updateObra(id: string, payload: Partial<Obra>): Promise<Obra> {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { log, medicoes, correspondente, ...rest } = payload as Obra;
+  const { id: _id, created_at, updated_at, log, medicoes, correspondente, ...rest } = payload as Obra;
   const { data, error } = await supabase
     .from("obras")
     .update(rest as never)
@@ -59,14 +59,28 @@ export async function registrarLogObra(obraId: string, etapa: string): Promise<v
 
 // ─── Medições ─────────────────────────────────────────────────────────────────
 export async function upsertMedicao(medicao: Partial<Medicao> & { obra_id: string }): Promise<Medicao> {
-  const { data, error } = await supabase
-    .from("medicoes")
-    .upsert(medicao as never)
-    .select()
-    .single();
+  // Nunca enviar campos gerenciados pelo DB
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { id, created_at, updated_at, ...fields } = medicao as Medicao;
 
-  if (error) throw error;
-  return data as unknown as Medicao;
+  if (id) {
+    const { data, error } = await supabase
+      .from("medicoes")
+      .update(fields as never)
+      .eq("id", id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as unknown as Medicao;
+  } else {
+    const { data, error } = await supabase
+      .from("medicoes")
+      .insert(fields as never)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as unknown as Medicao;
+  }
 }
 
 export async function deleteMedicao(id: string): Promise<void> {

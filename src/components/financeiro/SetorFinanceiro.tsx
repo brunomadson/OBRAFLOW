@@ -727,7 +727,7 @@ function TabDashboard({ lancamentos, obras, onAbrirPrioridades, onPagar }: {
   const lucroLiq  = totalRec - totalSai;
 
   // Médições pendentes
-  const medicoesPend = obras.flatMap((o) => (o.medicoes ?? []).filter((m) => m.status !== "laudo_emitido" && m.status !== "pagamento")).length;
+  const medicoesPend = obras.flatMap((o) => (o.medicoes ?? []).filter((m) => m.status !== "laudo_emitido" && m.status !== "paga")).length;
 
   // Pagamentos
   const pagos   = lancamentos.filter((l) => l.tipo === "saida" && statusReal(l) === "pago");

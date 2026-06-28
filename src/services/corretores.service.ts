@@ -23,3 +23,11 @@ export async function createCorretor(c: Omit<Corretor, "id" | "ativo">): Promise
   if (error) throw error;
   return data as Corretor;
 }
+
+export async function deleteCorretor(id: string): Promise<void> {
+  const { error } = await supabase
+    .from("corretores")
+    .update({ ativo: false })
+    .eq("id", id);
+  if (error) throw error;
+}

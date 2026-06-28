@@ -11,8 +11,8 @@ import {
 } from "@/constants/dominios";
 import { DOCS_PESSOAIS_FIXOS, DOCS_CONJUGE, DOCS_DEPENDENTE, DOCS_POR_RENDA, type DocItem } from "@/constants/documentos";
 import { fmtBRL, fmtDate, fmtDateTime, maskCPF, maskPhone, gerarLinkCalendar, validarCPF } from "@/lib/utils";
-import { getCorrespondentes, createCorrespondente } from "@/services/correspondentes.service";
-import { getCorretores, createCorretor } from "@/services/corretores.service";
+import { getCorrespondentes, createCorrespondente, deleteCorrespondente } from "@/services/correspondentes.service";
+import { getCorretores, createCorretor, deleteCorretor } from "@/services/corretores.service";
 import { getCidades, createCidade, deleteCidade } from "@/services/cidades.service";
 import type { Lead, EtapaLead, Correspondente, Corretor, Cidade } from "@/types/app.types";
 import toast from "react-hot-toast";
@@ -59,16 +59,19 @@ function IconTrash() {
   );
 }
 
-/* ───────── sub-modal: Novo Correspondente ────────────────────────────────── */
+/* ───────── sub-modal: Gerenciar Correspondentes ──────────────────────────── */
 function ModalNovoCorrespondente({
-  onClose, onSaved, cidades,
+  onClose, onSaved, onDeleted, cidades, correspondentes,
 }: {
   onClose: () => void;
   onSaved: (c: Correspondente) => void;
+  onDeleted: (id: string) => void;
   cidades: Cidade[];
+  correspondentes: Correspondente[];
 }) {
   const [form, setForm] = useState({ nome: "", contato: "", email: "", cidade: "", agencia: "" });
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const set = (k: keyof typeof form, v: string) => setForm((p) => ({ ...p, [k]: v }));
 
   const handleSave = async () => {
@@ -83,57 +86,105 @@ function ModalNovoCorrespondente({
         agencia: form.agencia || null,
       });
       toast.success("Correspondente cadastrado!");
+      setForm({ nome: "", contato: "", email: "", cidade: "", agencia: "" });
       onSaved(novo);
     } catch {
       toast.error("Erro ao cadastrar correspondente");
     } finally { setSaving(false); }
   };
 
+  const handleDelete = async (id: string) => {
+    setDeletingId(id);
+    try {
+      await deleteCorrespondente(id);
+      onDeleted(id);
+    } catch {
+      toast.error("Erro ao remover correspondente");
+    } finally { setDeletingId(null); }
+  };
+
   return (
     <Modal onClose={onClose} size="sm">
-      <ModalHeader title="Novo Correspondente" onClose={onClose} />
-      <div className="p-5 space-y-3">
+      <ModalHeader title="Gerenciar Correspondentes" onClose={onClose} />
+      <div className="p-5 space-y-4">
+        {/* Lista existente */}
         <div>
-          <label className="field-label">Nome do Correspondente *</label>
-          <input value={form.nome} onChange={(e) => set("nome", e.target.value)} className="input-base" placeholder="Ex: Genilza" />
+          <p className="field-label mb-2">Cadastrados ({correspondentes.length})</p>
+          <div className="space-y-1 max-h-44 overflow-y-auto pr-1">
+            {correspondentes.length === 0 && (
+              <p className="text-xs text-slate-400 text-center py-4">Nenhum correspondente cadastrado</p>
+            )}
+            {correspondentes.map((c) => (
+              <div
+                key={c.id}
+                className="flex items-center justify-between py-2 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors"
+              >
+                <div className="min-w-0">
+                  <span className="text-sm text-slate-700">{c.nome}</span>
+                  {(c.agencia || c.banco) && (
+                    <span className="text-[11px] text-slate-400 ml-2">— {c.agencia || c.banco}</span>
+                  )}
+                </div>
+                <button
+                  onClick={() => handleDelete(c.id)}
+                  disabled={deletingId === c.id}
+                  title="Remover correspondente"
+                  className="text-slate-300 hover:text-red-400 transition-colors disabled:opacity-40 p-0.5 flex-shrink-0 ml-2"
+                >
+                  <IconTrash />
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
-        <div>
-          <label className="field-label">Agência / Banco</label>
-          <input value={form.agencia} onChange={(e) => set("agencia", e.target.value)} className="input-base" placeholder="Ex: Agência Presidente Dutra" />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
+
+        {/* Formulário de adição */}
+        <div className="border-t border-slate-100 pt-4 space-y-3">
+          <p className="field-label">Adicionar Novo</p>
           <div>
-            <label className="field-label">Telefone</label>
-            <input value={form.contato} onChange={(e) => set("contato", maskPhone(e.target.value))} maxLength={15} className="input-base" placeholder="(00) 00000-0000" />
+            <label className="field-label">Nome *</label>
+            <input value={form.nome} onChange={(e) => set("nome", e.target.value)} className="input-base" placeholder="Ex: Genilza" />
           </div>
           <div>
-            <label className="field-label">E-mail</label>
-            <input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} className="input-base" placeholder="email@banco.com" />
+            <label className="field-label">Agência / Banco</label>
+            <input value={form.agencia} onChange={(e) => set("agencia", e.target.value)} className="input-base" placeholder="Ex: Agência Presidente Dutra" />
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="field-label">Telefone</label>
+              <input value={form.contato} onChange={(e) => set("contato", maskPhone(e.target.value))} maxLength={15} className="input-base" placeholder="(00) 00000-0000" />
+            </div>
+            <div>
+              <label className="field-label">E-mail</label>
+              <input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} className="input-base" placeholder="email@banco.com" />
+            </div>
+          </div>
+          <div>
+            <label className="field-label">Cidade</label>
+            <select value={form.cidade} onChange={(e) => set("cidade", e.target.value)} className="input-base">
+              <option value="">Selecione</option>
+              {cidades.map((c) => <option key={c.id} value={c.nome}>{c.nome}</option>)}
+            </select>
+          </div>
+          <Button variant="primary" className="w-full" loading={saving} onClick={handleSave}>Cadastrar</Button>
         </div>
-        <div>
-          <label className="field-label">Cidade</label>
-          <select value={form.cidade} onChange={(e) => set("cidade", e.target.value)} className="input-base">
-            <option value="">Selecione</option>
-            {cidades.map((c) => <option key={c.id} value={c.nome}>{c.nome}</option>)}
-          </select>
-        </div>
-        <div className="flex gap-2 pt-2">
-          <Button variant="secondary" className="flex-1" onClick={onClose}>Cancelar</Button>
-          <Button variant="primary" className="flex-1" loading={saving} onClick={handleSave}>Cadastrar</Button>
-        </div>
+
+        <Button variant="secondary" className="w-full" onClick={onClose} size="sm">Fechar</Button>
       </div>
     </Modal>
   );
 }
 
-/* ───────── sub-modal: Novo Corretor ─────────────────────────────────────── */
-function ModalNovoCorretor({ onClose, onSaved }: {
+/* ───────── sub-modal: Gerenciar Corretores ──────────────────────────────── */
+function ModalNovoCorretor({ onClose, onSaved, onDeleted, corretores }: {
   onClose: () => void;
   onSaved: (c: Corretor) => void;
+  onDeleted: (id: string) => void;
+  corretores: Corretor[];
 }) {
   const [form, setForm] = useState({ nome: "", telefone: "", email: "" });
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const set = (k: keyof typeof form, v: string) => setForm((p) => ({ ...p, [k]: v }));
 
   const handleSave = async () => {
@@ -146,34 +197,79 @@ function ModalNovoCorretor({ onClose, onSaved }: {
         email: form.email || null,
       });
       toast.success("Corretor cadastrado!");
+      setForm({ nome: "", telefone: "", email: "" });
       onSaved(novo);
     } catch {
       toast.error("Erro ao cadastrar corretor");
     } finally { setSaving(false); }
   };
 
+  const handleDelete = async (id: string) => {
+    setDeletingId(id);
+    try {
+      await deleteCorretor(id);
+      onDeleted(id);
+    } catch {
+      toast.error("Erro ao remover corretor");
+    } finally { setDeletingId(null); }
+  };
+
   return (
     <Modal onClose={onClose} size="sm">
-      <ModalHeader title="Novo Corretor" onClose={onClose} />
-      <div className="p-5 space-y-3">
+      <ModalHeader title="Gerenciar Corretores" onClose={onClose} />
+      <div className="p-5 space-y-4">
+        {/* Lista existente */}
         <div>
-          <label className="field-label">Nome do Corretor *</label>
-          <input value={form.nome} onChange={(e) => set("nome", e.target.value)} className="input-base" placeholder="Nome completo" />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="field-label">Telefone</label>
-            <input value={form.telefone} onChange={(e) => set("telefone", maskPhone(e.target.value))} maxLength={15} className="input-base" placeholder="(00) 00000-0000" />
+          <p className="field-label mb-2">Cadastrados ({corretores.length})</p>
+          <div className="space-y-1 max-h-44 overflow-y-auto pr-1">
+            {corretores.length === 0 && (
+              <p className="text-xs text-slate-400 text-center py-4">Nenhum corretor cadastrado</p>
+            )}
+            {corretores.map((c) => (
+              <div
+                key={c.id}
+                className="flex items-center justify-between py-2 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors"
+              >
+                <div className="min-w-0">
+                  <span className="text-sm text-slate-700">{c.nome}</span>
+                  {c.telefone && (
+                    <span className="text-[11px] text-slate-400 ml-2">— {c.telefone}</span>
+                  )}
+                </div>
+                <button
+                  onClick={() => handleDelete(c.id)}
+                  disabled={deletingId === c.id}
+                  title="Remover corretor"
+                  className="text-slate-300 hover:text-red-400 transition-colors disabled:opacity-40 p-0.5 flex-shrink-0 ml-2"
+                >
+                  <IconTrash />
+                </button>
+              </div>
+            ))}
           </div>
+        </div>
+
+        {/* Formulário de adição */}
+        <div className="border-t border-slate-100 pt-4 space-y-3">
+          <p className="field-label">Adicionar Novo</p>
           <div>
-            <label className="field-label">E-mail</label>
-            <input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} className="input-base" placeholder="email@exemplo.com" />
+            <label className="field-label">Nome *</label>
+            <input value={form.nome} onChange={(e) => set("nome", e.target.value)} className="input-base" placeholder="Nome completo" />
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="field-label">Telefone</label>
+              <input value={form.telefone} onChange={(e) => set("telefone", maskPhone(e.target.value))} maxLength={15} className="input-base" placeholder="(00) 00000-0000" />
+            </div>
+            <div>
+              <label className="field-label">E-mail</label>
+              <input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} className="input-base" placeholder="email@exemplo.com" />
+            </div>
+          </div>
+          <Button variant="primary" className="w-full" loading={saving} onClick={handleSave}>Cadastrar</Button>
         </div>
-        <div className="flex gap-2 pt-2">
-          <Button variant="secondary" className="flex-1" onClick={onClose}>Cancelar</Button>
-          <Button variant="primary" className="flex-1" loading={saving} onClick={handleSave}>Cadastrar</Button>
-        </div>
+
+        <Button variant="secondary" className="w-full" onClick={onClose} size="sm">Fechar</Button>
       </div>
     </Modal>
   );
@@ -1064,21 +1160,27 @@ export default function ModalLead({ lead, onClose, onSave, onAvancar, onEnviarOb
       {subModal === "novoCorrespondente" && (
         <ModalNovoCorrespondente
           cidades={cidades}
+          correspondentes={correspondentes}
           onClose={() => setSubModal(null)}
           onSaved={(novo) => {
             setCorrespondentes((prev) => [...prev, novo].sort((a, b) => a.nome.localeCompare(b.nome)));
             setForm((f) => ({ ...f, correspondente_id: novo.id }));
-            setSubModal(null);
+          }}
+          onDeleted={(id) => {
+            setCorrespondentes((prev) => prev.filter((c) => c.id !== id));
           }}
         />
       )}
       {subModal === "novoCorretor" && (
         <ModalNovoCorretor
+          corretores={corretores}
           onClose={() => setSubModal(null)}
           onSaved={(novo) => {
             setCorretores((prev) => [...prev, novo].sort((a, b) => a.nome.localeCompare(b.nome)));
             setForm((f) => ({ ...f, corretor_id: novo.id, corretor: novo.nome }));
-            setSubModal(null);
+          }}
+          onDeleted={(id) => {
+            setCorretores((prev) => prev.filter((c) => c.id !== id));
           }}
         />
       )}

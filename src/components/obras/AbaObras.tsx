@@ -15,7 +15,7 @@ export default function AbaObras({ obras, busca, onEdit }: Props) {
 
   const filtradas = useMemo(() => {
     return obras.filter((o) => {
-      const matchBusca = o.cliente.toLowerCase().includes(busca.toLowerCase()) ||
+      const matchBusca = (o.cliente ?? "").toLowerCase().includes(busca.toLowerCase()) ||
         (o.cidade ?? "").toLowerCase().includes(busca.toLowerCase());
       const matchEtapa = etapaFiltro === "todas" || o.etapa === etapaFiltro;
       return matchBusca && matchEtapa;
@@ -54,7 +54,7 @@ export default function AbaObras({ obras, busca, onEdit }: Props) {
           <p className="font-semibold">Nenhuma obra encontrada</p>
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-4 gap-3">
           {filtradas.map((o) => (
             <CardObra key={o.id} obra={o} onClick={onEdit} />
           ))}

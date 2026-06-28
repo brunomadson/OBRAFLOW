@@ -66,7 +66,50 @@ DROP POLICY IF EXISTS "corretores_auth" ON corretores;
 CREATE POLICY "corretores_auth" ON corretores
   FOR ALL USING (auth.role() = 'authenticated');
 
--- 5. Novos campos em lancamentos (Financeiro)
+-- 5. Adicionar novas colunas à tabela medicoes
+ALTER TABLE medicoes
+  ADD COLUMN IF NOT EXISTS nome             TEXT,
+  ADD COLUMN IF NOT EXISTS pct_solicitada   NUMERIC,
+  ADD COLUMN IF NOT EXISTS pct_liberada     NUMERIC,
+  ADD COLUMN IF NOT EXISTS valor_liberado   NUMERIC,
+  ADD COLUMN IF NOT EXISTS data_envio_caixa DATE,
+  ADD COLUMN IF NOT EXISTS data_laudo       DATE,
+  ADD COLUMN IF NOT EXISTS data_liberacao   DATE;
+
+-- Migrar dados antigos para os novos campos (se as colunas antigas existirem)
+-- numero_medicao → nome
+UPDATE medicoes
+SET nome = 'Medição ' || numero_medicao::text
+WHERE (nome IS NULL OR nome = '')
+  AND numero_medicao IS NOT NULL;
+
+-- valor → valor_liberado (campo antigo de valor)
+UPDATE medicoes
+SET valor_liberado = valor
+WHERE valor_liberado IS NULL AND valor IS NOT NULL;
+
+-- data_envio → data_envio_caixa
+UPDATE medicoes
+SET data_envio_caixa = data_envio
+WHERE data_envio_caixa IS NULL AND data_envio IS NOT NULL;
+
+-- Fallback: nome padrão para registros que ainda não têm nome
+UPDATE medicoes
+SET nome = 'Medição'
+WHERE nome IS NULL OR nome = '';
+
+-- Migrar status antigos → novos valores
+UPDATE medicoes SET status = 'a_solicitar' WHERE status = 'pendente';
+UPDATE medicoes SET status = 'solicitada'  WHERE status IN ('enviada', 'realizada');
+UPDATE medicoes SET status = 'paga'        WHERE status IN ('pago', 'pagamento');
+
+-- Atualizar/criar constraint de status (agora que os dados já foram migrados)
+ALTER TABLE medicoes DROP CONSTRAINT IF EXISTS medicoes_status_check;
+ALTER TABLE medicoes
+  ADD CONSTRAINT medicoes_status_check
+  CHECK (status IN ('a_solicitar','solicitada','laudo_emitido','paga'));
+
+-- 6. Novos campos em lancamentos (Financeiro)
 ALTER TABLE lancamentos
   ADD COLUMN IF NOT EXISTS categoria         TEXT,
   ADD COLUMN IF NOT EXISTS grupo             TEXT,

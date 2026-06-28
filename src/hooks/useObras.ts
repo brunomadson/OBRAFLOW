@@ -75,11 +75,11 @@ export function useObras() {
           };
         })
       );
-      toast.success("Medição salva!");
       return salva;
-    } catch {
-      toast.error("Erro ao salvar medição");
-      return null;
+    } catch (err) {
+      const msg = (err as { message?: string })?.message ?? "Erro desconhecido";
+      toast.error(`Erro ao salvar medição: ${msg}`);
+      throw err; // re-lança para o caller saber que falhou
     }
   }, []);
 

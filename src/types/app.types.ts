@@ -122,7 +122,7 @@ export type EtapaObra =
   | "entregue";
 
 export type StatusItem = "pendente" | "concluido" | "nao_necessario";
-export type StatusMedicao = "a_solicitar" | "solicitada" | "realizada" | "laudo_emitido" | "pagamento";
+export type StatusMedicao = "a_solicitar" | "solicitada" | "laudo_emitido" | "paga";
 
 export interface ProjetoObra {
   arquitetonico: StatusItem;
@@ -149,6 +149,8 @@ export interface EngCaixaObra {
   dtEnviado: string;
   solicitado: StatusItem;
   dtSolicitado: string;
+  boletoPago: StatusItem;
+  dtBoletoPago: string;
   vistoriaRealizada: StatusItem;
   dtVistoria: string;
   laudoEmitido: StatusItem;
@@ -175,6 +177,11 @@ export interface ObraLog {
   criado_em: string;
 }
 
+export interface MedicaoHistoricoEntry {
+  status: StatusMedicao;
+  data: string;
+}
+
 export interface Medicao {
   id: string;
   obra_id: string;
@@ -186,6 +193,7 @@ export interface Medicao {
   data_envio_caixa: string | null;
   data_laudo: string | null;
   data_liberacao: string | null;
+  historico: MedicaoHistoricoEntry[] | null;
   created_at: string;
   updated_at: string;
 }

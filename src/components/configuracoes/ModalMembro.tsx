@@ -14,7 +14,7 @@ interface Props {
 
 export default function ModalMembro({ membro, onClose, onSave }: Props) {
   const isNovo = !membro;
-  const [form, setForm] = useState<Partial<Profile>>(membro ?? { nome: "", cargo: CARGOS[0], setor: SETORES_ACESSO[0], ativo: true });
+  const [form, setForm] = useState<Partial<Profile>>(membro ?? { nome: "", cargo: CARGOS[0], setores: [SETORES_ACESSO[0].id], status: "ativo" });
   const [email, setEmail] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -50,13 +50,13 @@ export default function ModalMembro({ membro, onClose, onSave }: Props) {
         </div>
         <div>
           <label className="field-label">Setor de Acesso</label>
-          <select value={form.setor ?? ""} onChange={(e) => set("setor", e.target.value)} className="input-base">
-            {SETORES_ACESSO.map((s) => <option key={s}>{s}</option>)}
+          <select value={form.setores?.[0] ?? ""} onChange={(e) => set("setores", [e.target.value])} className="input-base">
+            {SETORES_ACESSO.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
           </select>
         </div>
         {!isNovo && (
           <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={!!form.ativo} onChange={(e) => set("ativo", e.target.checked)} className="accent-blue-500" />
+            <input type="checkbox" checked={form.status === "ativo"} onChange={(e) => set("status", e.target.checked ? "ativo" : "inativo")} className="accent-blue-500" />
             <span className="text-xs text-slate-700">Conta ativa</span>
           </label>
         )}

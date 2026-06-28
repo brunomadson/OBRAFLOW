@@ -26,7 +26,7 @@ function AbaPrazos() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const { error } = await supabase.from("config").upsert(config);
+      const { error } = await supabase.from("config").upsert(config as never);
       if (error) throw error;
       toast.success("Configurações salvas!");
     } catch { toast.error("Erro ao salvar."); }
@@ -36,9 +36,8 @@ function AbaPrazos() {
   return (
     <div className="max-w-2xl">
       {GRUPOS_CONFIG.map((grupo) => (
-        <div key={grupo.titulo} className="card p-5 mb-4">
-          <p className="text-[13px] font-bold text-slate-900 mb-1">{grupo.titulo}</p>
-          <p className="text-xs text-slate-400 mb-3.5">{grupo.desc}</p>
+        <div key={grupo.id} className="card p-5 mb-4">
+          <p className="text-[13px] font-bold text-slate-900 mb-1">{grupo.label}</p>
           <div className="space-y-3">
             {grupo.itens.map((campo) => (
               <div key={campo.key} className="flex items-center justify-between gap-4">
@@ -50,11 +49,11 @@ function AbaPrazos() {
                   <input
                     type="number"
                     min={1}
-                    value={config[campo.key] ?? campo.padrao}
+                    value={config[campo.key] ?? 0}
                     onChange={(e) => setConfig((p) => ({ ...p, [campo.key]: Number(e.target.value) }))}
                     className="input-base w-20 text-center"
                   />
-                  <span className="text-xs text-slate-400">dias</span>
+                  <span className="text-xs text-slate-400">{campo.unidade}</span>
                 </div>
               </div>
             ))}
@@ -109,10 +108,10 @@ function AbaMembros() {
                 </div>
                 <div>
                   <p className="text-[13px] font-semibold text-slate-900">{m.nome}</p>
-                  <p className="text-[11px] text-slate-400">{m.cargo} · {m.setor}</p>
+                  <p className="text-[11px] text-slate-400">{m.cargo} · {m.setores?.[0] ?? ""}</p>
                 </div>
               </div>
-              <Badge color={m.ativo ? "#10B981" : "#94A3B8"}>{m.ativo ? "Ativo" : "Inativo"}</Badge>
+              <Badge color={m.status === "ativo" ? "#10B981" : "#94A3B8"}>{m.status === "ativo" ? "Ativo" : "Inativo"}</Badge>
             </div>
           ))}
         </div>

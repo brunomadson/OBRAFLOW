@@ -27,7 +27,7 @@ export async function createCorretor(c: Omit<Corretor, "id" | "ativo">): Promise
 export async function deleteCorretor(id: string): Promise<void> {
   const { error } = await supabase
     .from("corretores")
-    .update({ ativo: false })
+    .update({ ativo: false } as never)
     .eq("id", id);
   if (error) throw error;
 }

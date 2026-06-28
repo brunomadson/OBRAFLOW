@@ -30,8 +30,11 @@ const CardKanban = memo(function CardKanban({ lead, etapaCor, onClick }: CardPro
       )}
       <div className="flex justify-between items-center">
         <div className="flex gap-1">
+          {lead.com_conjuge && (
+            <span className="text-[9px] font-bold bg-blue-50 text-blue-700 rounded px-1.5 py-0.5">Cônjuge</span>
+          )}
           {lead.dependente && (
-            <span className="text-[9px] font-bold bg-yellow-50 text-yellow-700 rounded px-1.5 py-0.5">DEP</span>
+            <span className="text-[9px] font-bold bg-yellow-50 text-yellow-700 rounded px-1.5 py-0.5">Dependente</span>
           )}
           {lead.fgts_3anos && (
             <span className="text-[9px] font-bold bg-emerald-50 text-emerald-700 rounded px-1.5 py-0.5">FGTS+3</span>

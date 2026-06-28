@@ -5,15 +5,15 @@ import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import Timeline from "@/components/shared/Timeline";
 import StatusBadgeMedicao from "@/components/shared/StatusBadgeMedicao";
-import ChecklistDocumentosObra from "./ChecklistDocumentosObra";
+import AbaDocumentos from "@/components/shared/AbaDocumentos";
 import ModalMedicao from "./ModalMedicao";
 import { ETAPAS_OBRA, FLUXO_OBRA } from "@/constants/etapas";
-import { CIDADES, ENGENHEIROS, MODALIDADES } from "@/constants/dominios";
+import { CIDADES, ENGENHEIROS, MODALIDADES, ORIGENS, ORIGENS_RECURSO, TIPOS_RENDA } from "@/constants/dominios";
 import { fmtBRL, fmtDate, maskCPF, maskPhone } from "@/lib/utils";
 import type { Obra, Medicao, EtapaObra, EngCaixaObra, ConformidadeObra, StatusItem } from "@/types/app.types";
 import toast from "react-hot-toast";
 
-type Tab = "perfil" | "medicoes" | "docs" | "editar";
+type Tab = "perfil" | "medicoes" | "documentos" | "editar";
 
 // ── Helper date+hora ──────────────────────────────────────────────────────────
 function fmtDH(iso: string | null | undefined) {
@@ -273,7 +273,7 @@ export default function ModalObra({ obra, onClose, onSave, onAvancar, onSalvarMe
 
   const tabs: [Tab, string][] = isNovo
     ? [["editar", "Dados"]]
-    : [["perfil", "Perfil"], ["medicoes", "Medições"], ["docs", "Docs"], ["editar", "Editar"]];
+    : [["perfil", "Perfil"], ["medicoes", "Medições"], ["documentos", "Documentos"], ["editar", "Editar"]];
 
   const medicoes = obra?.medicoes ?? [];
   const ETAPAS_POS_CONTRATO = new Set(["contrato", "execucao", "entregue"]);
@@ -473,14 +473,15 @@ export default function ModalObra({ obra, onClose, onSave, onAvancar, onSalvarMe
           )}
 
           {/* ── DOCUMENTOS ──────────────────────────────────────────────────── */}
-          {tab === "docs" && obra && (
-            <ChecklistDocumentosObra
-              obra={obra}
-              onSave={async (updates) => { await onSave({ ...form, ...updates }); }}
-              onAvancar={async (novaEtapa) => {
-                await onAvancar(obra.id, novaEtapa);
-                onClose();
-              }}
+          {tab === "documentos" && obra && (
+            <AbaDocumentos
+              leadId={obra.lead_id ?? undefined}
+              obraId={obra.id}
+              etapa={obra.etapa}
+              comConjuge={obra.com_conjuge}
+              dependente={obra.dependente}
+              tipoRenda={obra.tipo_renda}
+              fgts3anos={obra.fgts_3anos}
             />
           )}
 
@@ -505,6 +506,14 @@ export default function ModalObra({ obra, onClose, onSave, onAvancar, onSalvarMe
                     <input value={form.telefone ?? ""} onChange={(e) => set("telefone", maskPhone(e.target.value))} maxLength={15} className="input-base" />
                   </div>
                   <div>
+                    <label className="field-label">E-mail</label>
+                    <input type="email" value={form.email ?? ""} onChange={(e) => set("email", e.target.value)} className="input-base" />
+                  </div>
+                  <div>
+                    <label className="field-label">Data de Nascimento</label>
+                    <input type="date" value={form.nascimento ?? ""} onChange={(e) => set("nascimento", e.target.value)} className="input-base" />
+                  </div>
+                  <div>
                     <label className="field-label">Cidade</label>
                     <select value={form.cidade ?? ""} onChange={(e) => set("cidade", e.target.value)} className="input-base">
                       <option value="">Selecione</option>
@@ -516,6 +525,56 @@ export default function ModalObra({ obra, onClose, onSave, onAvancar, onSalvarMe
                     <select value={form.modalidade ?? ""} onChange={(e) => set("modalidade", e.target.value)} className="input-base">
                       {MODALIDADES.map((m) => <option key={m}>{m}</option>)}
                     </select>
+                  </div>
+                  <div>
+                    <label className="field-label">Tipo de Renda</label>
+                    <select value={form.tipo_renda ?? ""} onChange={(e) => set("tipo_renda", e.target.value)} className="input-base">
+                      <option value="">Selecione</option>
+                      {TIPOS_RENDA.map((t) => <option key={t}>{t}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="flex gap-5 flex-wrap mt-3">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={!!form.com_conjuge} onChange={(e) => set("com_conjuge", e.target.checked)} className="accent-blue-500" />
+                    <span className="text-xs text-slate-700">Possui cônjuge</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={!!form.dependente} onChange={(e) => set("dependente", e.target.checked)} className="accent-blue-500" />
+                    <span className="text-xs text-slate-700">Possui dependente</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={!!form.fgts_3anos} onChange={(e) => set("fgts_3anos", e.target.checked)} className="accent-blue-500" />
+                    <span className="text-xs text-slate-700">FGTS 3+ anos</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Origem */}
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Canal e Origem</p>
+                <div className="grid grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="field-label">Canal de Origem</label>
+                    <select value={form.origem ?? ""} onChange={(e) => set("origem", e.target.value)} className="input-base">
+                      <option value="">Selecione</option>
+                      {ORIGENS.map((o) => <option key={o}>{o}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="field-label">Origem do Recurso</label>
+                    <select value={form.origem_recurso ?? ""} onChange={(e) => set("origem_recurso", e.target.value || null)} className="input-base">
+                      <option value="">Selecione</option>
+                      {ORIGENS_RECURSO.map((o) => <option key={o}>{o}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="field-label">Corretor</label>
+                    <input value={form.corretor ?? ""} onChange={(e) => set("corretor", e.target.value)} className="input-base" placeholder="Nome do corretor" />
+                  </div>
+                  <div>
+                    <label className="field-label">Indicado por</label>
+                    <input value={form.indicado_por ?? ""} onChange={(e) => set("indicado_por", e.target.value)} className="input-base" placeholder="Nome de quem indicou" />
                   </div>
                 </div>
               </div>

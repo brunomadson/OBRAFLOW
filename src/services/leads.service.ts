@@ -37,9 +37,11 @@ export async function createLead(payload: Omit<Lead, "id" | "created_at" | "upda
 }
 
 export async function updateLead(id: string, payload: Partial<Lead>): Promise<Lead> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { id: _id, created_at, updated_at, log, responsavel, correspondente, ...rest } = payload as Lead;
   const { data, error } = await supabase
     .from("leads")
-    .update(payload as never)
+    .update(rest as never)
     .eq("id", id)
     .select()
     .single();
@@ -57,6 +59,6 @@ export async function registrarLogLead(
     lead_id: leadId,
     etapa,
     dados_extras: dadosExtras,
-  });
+  } as never);
   if (error) throw error;
 }

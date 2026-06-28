@@ -1,11 +1,11 @@
 "use client";
 import { useState } from "react";
-import { createBrowserClient } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
 export default function ResetPasswordPage() {
-  const supabase = createBrowserClient();
+  const supabase = createClient();
   const router   = useRouter();
   const [senha, setSenha]     = useState("");
   const [confirm, setConfirm] = useState("");

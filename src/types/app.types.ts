@@ -65,7 +65,7 @@ export interface LeadLog {
   lead_id: string;
   etapa: string;
   dados_extras: Record<string, unknown> | null;
-  criado_em: string;
+  created_at: string;
 }
 
 export interface Lead {
@@ -174,7 +174,7 @@ export interface ObraLog {
   id: string;
   obra_id: string;
   etapa: string;
-  criado_em: string;
+  created_at: string;
 }
 
 export interface MedicaoHistoricoEntry {
@@ -226,6 +226,12 @@ export interface Obra {
   tipo_renda: string | null;
   dependente: boolean;
   fgts_3anos: boolean;
+  com_conjuge: boolean;
+  origem: string | null;
+  corretor: string | null;
+  corretor_id: string | null;
+  indicado_por: string | null;
+  origem_recurso: string | null;
   responsavel_comercial_id: string | null;
   data_contato: string | null;
   data_reuniao: string | null;
@@ -271,6 +277,22 @@ export interface Lancamento {
   parcela_total: number | null;
   obs: string | null;
   created_at: string;
+}
+
+// ─── Domínio: Documento (upload de arquivos) ──────────────────────────────────
+export interface Documento {
+  id: string;
+  lead_id: string | null;
+  obra_id: string | null;
+  secao: string;
+  tipo_doc: string;
+  nome_arquivo: string;
+  tamanho_bytes: number | null;
+  mime_type: string | null;
+  storage_path: string;
+  created_at: string;
+  usuario_id: string | null;
+  ativo: boolean;
 }
 
 // ─── Domínio: Notificações ────────────────────────────────────────────────────

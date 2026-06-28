@@ -53,7 +53,7 @@ export async function updateObra(id: string, payload: Partial<Obra>): Promise<Ob
 export async function registrarLogObra(obraId: string, etapa: string): Promise<void> {
   const { error } = await supabase
     .from("obra_log")
-    .insert({ obra_id: obraId, etapa });
+    .insert({ obra_id: obraId, etapa } as never);
   if (error) throw error;
 }
 

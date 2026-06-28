@@ -49,7 +49,7 @@ export function useObras() {
       setObras((prev) =>
         prev.map((o) =>
           o.id === obra.id
-            ? { ...o, etapa: novaEtapa, log: [...(o.log ?? []), { id: "", obra_id: obra.id, etapa: novaEtapa, criado_em: new Date().toISOString() }] }
+            ? { ...o, etapa: novaEtapa, log: [...(o.log ?? []), { id: "", obra_id: obra.id, etapa: novaEtapa, created_at: new Date().toISOString() }] }
             : o
         )
       );

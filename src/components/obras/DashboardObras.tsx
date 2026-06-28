@@ -209,17 +209,17 @@ export default function DashboardObras({ obras }: Props) {
     const temposPorEtapa: Record<string, number[]> = {};
     obras.forEach((obra) => {
       if (!obra.log || obra.log.length === 0) return;
-      const sorted = [...obra.log].sort((a, b) => new Date(a.criado_em).getTime() - new Date(b.criado_em).getTime());
+      const sorted = [...obra.log].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
       for (let i = 0; i < sorted.length - 1; i++) {
         const etapa = sorted[i].etapa;
-        const dias = Math.round((new Date(sorted[i + 1].criado_em).getTime() - new Date(sorted[i].criado_em).getTime()) / 86_400_000);
+        const dias = Math.round((new Date(sorted[i + 1].created_at).getTime() - new Date(sorted[i].created_at).getTime()) / 86_400_000);
         if (!temposPorEtapa[etapa]) temposPorEtapa[etapa] = [];
         temposPorEtapa[etapa].push(dias);
       }
       // Etapa atual (em andamento)
       if (obra.etapa !== "entregue") {
         const ultimo = sorted[sorted.length - 1];
-        const diasOngoing = Math.round((Date.now() - new Date(ultimo.criado_em).getTime()) / 86_400_000);
+        const diasOngoing = Math.round((Date.now() - new Date(ultimo.created_at).getTime()) / 86_400_000);
         const etapaAtual = obra.etapa;
         if (!temposPorEtapa[etapaAtual]) temposPorEtapa[etapaAtual] = [];
         temposPorEtapa[etapaAtual].push(diasOngoing);

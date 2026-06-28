@@ -19,7 +19,7 @@ export function useNotificacoes(
       if (lead.etapa === "analise" && lead.correspondente_id) {
         const logAnalise = lead.log?.find((l) => l.etapa === "analise");
         if (logAnalise) {
-          const horas = horasDecorridas(logAnalise.criado_em) ?? 0;
+          const horas = horasDecorridas(logAnalise.created_at) ?? 0;
           if (horas >= cfg.analise_credito_horas) {
             notifs.push({
               id: id(),
@@ -49,7 +49,7 @@ export function useNotificacoes(
       if (lead.etapa === "documentacao") {
         const logDoc = lead.log?.find((l) => l.etapa === "documentacao");
         if (logDoc) {
-          const dias = diasDecorridos(logDoc.criado_em) ?? 0;
+          const dias = diasDecorridos(logDoc.created_at) ?? 0;
           if (dias >= cfg.documentacao_critico_dias) {
             notifs.push({
               id: id(),
@@ -83,7 +83,7 @@ export function useNotificacoes(
         if (!obra.projeto?.dtArquitetonico) {
           const logProjeto = obra.log?.find((l) => l.etapa === "projeto");
           if (logProjeto) {
-            const dias = diasDecorridos(logProjeto.criado_em) ?? 0;
+            const dias = diasDecorridos(logProjeto.created_at) ?? 0;
             if (dias >= cfg.projeto_arquitetonico_dias) {
               notifs.push({
                 id: id(),
@@ -117,7 +117,7 @@ export function useNotificacoes(
           .filter((m) => m.status !== "a_solicitar")
           .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())[0];
         const logExec = obra.log?.find((l) => l.etapa === "execucao");
-        const dataRef = ultimaMed?.updated_at ?? logExec?.criado_em;
+        const dataRef = ultimaMed?.updated_at ?? logExec?.created_at;
         if (dataRef) {
           const dias = diasDecorridos(dataRef) ?? 0;
           if (dias >= cfg.pls_intervalo_dias) {

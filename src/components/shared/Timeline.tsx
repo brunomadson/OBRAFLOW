@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 
 interface LogEntry {
   etapa: string;
+  created_at?: string;
   criado_em?: string;
   data?: Date | string;
   dados_extras?: Record<string, unknown> | null;
@@ -86,6 +87,7 @@ export default function Timeline({
           const futuro   = i > idxAtual;
           const logEntry = getLog(etapa.id);
           const dataStr  =
+            logEntry?.created_at ??
             logEntry?.criado_em ??
             (logEntry?.data instanceof Date
               ? logEntry.data.toISOString()

@@ -6,16 +6,23 @@ import AbaObras from "./AbaObras";
 import AbaMedicoes from "./AbaMedicoes";
 import ModalObra from "./ModalObra";
 import { SkeletonCard } from "@/components/ui/Skeleton";
-import type { Obra, Medicao, EtapaObra } from "@/types/app.types";
+import type { EtapaObra } from "@/types/app.types";
 
 type Aba = "dashboard" | "obras" | "medicoes";
 
 export default function SetorObras() {
   const { obras, loading, salvar, avancarEtapa, salvarMedicao, removerMedicao } = useObras();
-  const [aba, setAba]           = useState<Aba>("dashboard");
-  const [busca, setBusca]       = useState("");
-  const [modalObra, setModalObra] = useState<Obra | "nova" | null>(null);
-  const [editMedObj, setEditMedObj] = useState<{ obra: Obra; medicao: Medicao } | null>(null);
+  const [aba, setAba]     = useState<Aba>("dashboard");
+  const [busca, setBusca] = useState("");
+
+  // Armazena só o ID para que o modal sempre reflita o estado atual das obras
+  const [modalObraId, setModalObraId] = useState<string | "nova" | null>(null);
+
+  const modalObra = modalObraId === null
+    ? null
+    : modalObraId === "nova"
+      ? null
+      : obras.find((o) => o.id === modalObraId) ?? null;
 
   const tabs: [Aba, string][] = [
     ["dashboard", "Dashboard"],
@@ -41,7 +48,7 @@ export default function SetorObras() {
               className="border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 outline-none focus:border-blue-400 w-44"
             />
           )}
-          <button onClick={() => setModalObra("nova")} className="btn-primary text-xs px-3 py-1.5">
+          <button onClick={() => setModalObraId("nova")} className="btn-primary text-xs px-3 py-1.5">
             + Nova Obra
           </button>
         </div>
@@ -56,37 +63,23 @@ export default function SetorObras() {
           <>
             {aba === "dashboard" && <DashboardObras obras={obras} />}
             {aba === "obras" && (
-              <AbaObras obras={obras} busca={busca} onEdit={setModalObra} />
+              <AbaObras obras={obras} busca={busca} onEdit={(obra) => setModalObraId(obra.id)} />
             )}
             {aba === "medicoes" && (
               <AbaMedicoes
                 obras={obras}
-                onEditMedicao={(obra, medicao) => setEditMedObj({ obra, medicao })}
+                onEditMedicao={(obra, _m) => { void _m; setModalObraId(obra.id); }}
               />
             )}
           </>
         )}
       </div>
 
-      {modalObra !== null && (
+      {modalObraId !== null && (
         <ModalObra
-          obra={modalObra === "nova" ? null : modalObra}
-          onClose={() => setModalObra(null)}
-          onSave={async (data) => { await salvar(data); }}
-          onAvancar={async (id: string, novaEtapa: EtapaObra) => {
-            const obraObj = obras.find((o) => o.id === id);
-            if (obraObj) await avancarEtapa(obraObj, novaEtapa);
-          }}
-          onSalvarMedicao={async (obraId, data) => { await salvarMedicao(obraId, data); }}
-          onRemoverMedicao={removerMedicao}
-        />
-      )}
-
-      {editMedObj && (
-        <ModalObra
-          obra={editMedObj.obra}
-          onClose={() => setEditMedObj(null)}
-          onSave={async (data) => { await salvar(data); }}
+          obra={modalObra}
+          onClose={() => setModalObraId(null)}
+          onSave={async (data) => { await salvar(data); if (modalObraId === "nova") setModalObraId(null); }}
           onAvancar={async (id: string, novaEtapa: EtapaObra) => {
             const obraObj = obras.find((o) => o.id === id);
             if (obraObj) await avancarEtapa(obraObj, novaEtapa);

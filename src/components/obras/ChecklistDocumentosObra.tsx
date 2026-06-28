@@ -201,7 +201,7 @@ export default function ChecklistDocumentosObra({ obra, onSave, onAvancar }: Pro
           onDate={(v) => setProjeto((p) => ({ ...p, dtComplementares: v }))}
         />
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-[11px] text-blue-700">
-          <strong>Dica:</strong> Se os Projetos Complementares não são necessários para esta obra, clique duas vezes no item para marcá-lo como <em>"Não necessário"</em> — isso não trava o avanço da etapa.
+          <strong>Dica:</strong> Se os Projetos Complementares não são necessários para esta obra, clique duas vezes no item para marcá-lo como <em>&quot;Não necessário&quot;</em> — isso não trava o avanço da etapa.
         </div>
         <Button variant="primary" size="sm" onClick={salvar} loading={saving}>Salvar Checklist</Button>
       </div>
@@ -250,7 +250,7 @@ export default function ChecklistDocumentosObra({ obra, onSave, onAvancar }: Pro
           onDate={(v) => setLicencas((p) => ({ ...p, dtUsoOcupacaoAprovado: v }))}
         />
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-[11px] text-amber-700">
-          <strong>Atenção:</strong> "Uso e Ocupação do Solo" é exigido apenas por algumas prefeituras. Marque como <em>"Não necessário"</em> se não for o caso desta cidade.
+          <strong>Atenção:</strong> &quot;Uso e Ocupação do Solo&quot; é exigido apenas por algumas prefeituras. Marque como <em>&quot;Não necessário&quot;</em> se não for o caso desta cidade.
         </div>
         <Button variant="primary" size="sm" onClick={salvar} loading={saving}>Salvar Checklist</Button>
       </div>

@@ -65,3 +65,14 @@ ALTER TABLE corretores ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "corretores_auth" ON corretores;
 CREATE POLICY "corretores_auth" ON corretores
   FOR ALL USING (auth.role() = 'authenticated');
+
+-- 5. Novos campos em lancamentos (Financeiro)
+ALTER TABLE lancamentos
+  ADD COLUMN IF NOT EXISTS categoria         TEXT,
+  ADD COLUMN IF NOT EXISTS grupo             TEXT,
+  ADD COLUMN IF NOT EXISTS data_vencimento   DATE,
+  ADD COLUMN IF NOT EXISTS data_confirmacao  TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS forma_pagamento   TEXT,
+  ADD COLUMN IF NOT EXISTS status_pagamento  TEXT DEFAULT 'pago',
+  ADD COLUMN IF NOT EXISTS parcela_num       INTEGER,
+  ADD COLUMN IF NOT EXISTS parcela_total     INTEGER;

@@ -193,7 +193,9 @@ export interface Medicao {
 export interface Obra {
   id: string;
   lead_id: string | null;
-  nome: string;
+  // DB usa "cliente" como nome principal da obra
+  cliente: string | null;
+  nome: string | null;        // alias / legado
   cpf: string | null;
   telefone: string | null;
   email: string | null;
@@ -203,6 +205,7 @@ export interface Obra {
   endereco: string | null;
   engenheiro: string | null;
   correspondente_id: string | null;
+  responsavel_id: string | null;
   tamanho_imovel: string | null;
   com_muro: ComMuro | null;
   valor_obra: number | null;
@@ -218,11 +221,15 @@ export interface Obra {
   responsavel_comercial_id: string | null;
   data_contato: string | null;
   data_reuniao: string | null;
+  data_inicio: string | null;
+  prazo_conclusao: string | null;
   anotacoes_comercial: string | null;
   data_assinatura: string | null;
   previsao_termino: string | null;
   etapa: EtapaObra;
   progresso: number;
+  pls: string | null;
+  obs: string | null;
   projeto: ProjetoObra;
   licencas: LicencasObra;
   eng_caixa: EngCaixaObra;
@@ -236,17 +243,25 @@ export interface Obra {
 }
 
 // ─── Domínio: Financeiro ──────────────────────────────────────────────────────
-export type TipoLancamento = "entrada" | "saida";
+export type TipoLancamento  = "entrada" | "saida";
+export type StatusPagamento = "pendente" | "pago" | "vencido";
 
 export interface Lancamento {
   id: string;
   obra_id: string | null;
   tipo: TipoLancamento;
-  categoria?: string;
+  categoria: string;
+  grupo: string | null;
   descricao: string;
   valor: number;
   data: string;
-  obs?: string | null;
+  data_vencimento: string | null;
+  data_confirmacao: string | null;
+  forma_pagamento: string | null;
+  status_pagamento: StatusPagamento;
+  parcela_num: number | null;
+  parcela_total: number | null;
+  obs: string | null;
   created_at: string;
 }
 

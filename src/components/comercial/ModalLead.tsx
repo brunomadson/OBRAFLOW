@@ -10,6 +10,7 @@ import {
   LOCAIS_REUNIAO, MOTIVOS_REPROVACAO, COM_MURO_OPTIONS,
 } from "@/constants/dominios";
 import AbaDocumentos from "@/components/shared/AbaDocumentos";
+import AbaHistorico from "@/components/shared/AbaHistorico";
 import { fmtBRL, fmtDate, fmtDateTime, maskCPF, maskPhone, gerarLinkCalendar, validarCPF } from "@/lib/utils";
 import { getCorrespondentes, createCorrespondente, deleteCorrespondente } from "@/services/correspondentes.service";
 import { getCorretores, createCorretor, deleteCorretor } from "@/services/corretores.service";
@@ -18,7 +19,7 @@ import type { Lead, EtapaLead, Correspondente, Corretor, Cidade } from "@/types/
 import toast from "react-hot-toast";
 
 /* ───────── helpers ───────────────────────────────────────────────────────── */
-type Tab = "perfil" | "docs" | "editar";
+type Tab = "perfil" | "docs" | "historico" | "editar";
 type SubModal =
   | "reuniao"
   | "analise"
@@ -986,7 +987,7 @@ export default function ModalLead({ lead, onClose, onSave, onAvancar, onEnviarOb
 
   const tabs: [Tab, string][] = isNovo
     ? [["editar", "Dados do Lead"]]
-    : [["perfil", "Perfil"], ["docs", "Documentos"], ["editar", "Editar"]];
+    : [["perfil", "Perfil"], ["docs", "Documentos"], ["historico", "Histórico"], ["editar", "Editar"]];
 
   return (
     <>
@@ -1026,6 +1027,9 @@ export default function ModalLead({ lead, onClose, onSave, onAvancar, onEnviarOb
               tipoRenda={lead.tipo_renda}
               fgts3anos={lead.fgts_3anos}
             />
+          )}
+          {tab === "historico" && lead && (
+            <AbaHistorico leadId={lead.id} />
           )}
           {tab === "editar" && (
             <FormLead

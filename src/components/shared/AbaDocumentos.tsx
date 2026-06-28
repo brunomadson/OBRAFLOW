@@ -6,6 +6,8 @@ import {
   getDocumentoUrl,
   deleteDocumento,
 } from "@/services/documentos.service";
+import { registrarHistorico } from "@/services/historico.service";
+import { useAuth } from "@/contexts/AuthContext";
 import type { Documento, EtapaObra } from "@/types/app.types";
 import toast from "react-hot-toast";
 
@@ -275,6 +277,8 @@ function DocTypeRow({
   onUploaded: (doc: Documento) => void;
   onDeleted: (id: string) => void;
 }) {
+  const { profile } = useAuth();
+  const nomeUsuario = profile?.nome ?? "Sistema";
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -291,6 +295,12 @@ function DocTypeRow({
           file, lead_id: leadId, obra_id: obraId, secao, tipo_doc: tipo.id,
         });
         onUploaded(novo);
+        await registrarHistorico({
+          lead_id: leadId ?? null, obra_id: obraId ?? null,
+          tipo: "documento", acao: `anexou o documento "${tipo.label}".`,
+          usuario_nome: nomeUsuario, usuario_id: null,
+          setor: obraId ? "obras" : "comercial", etapa: null,
+        }).catch(() => {});
       }
       toast.success(files.length > 1 ? `${files.length} arquivos enviados!` : "Arquivo enviado!");
     } catch {
@@ -304,6 +314,12 @@ function DocTypeRow({
   const handleDelete = async (doc: Documento) => {
     await deleteDocumento(doc);
     onDeleted(doc.id);
+    await registrarHistorico({
+      lead_id: leadId ?? null, obra_id: obraId ?? null,
+      tipo: "documento", acao: `removeu o documento "${tipo.label}".`,
+      usuario_nome: nomeUsuario, usuario_id: null,
+      setor: obraId ? "obras" : "comercial", etapa: null,
+    }).catch(() => {});
   };
 
   return (

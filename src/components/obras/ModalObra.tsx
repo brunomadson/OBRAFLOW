@@ -6,6 +6,9 @@ import Badge from "@/components/ui/Badge";
 import Timeline from "@/components/shared/Timeline";
 import StatusBadgeMedicao from "@/components/shared/StatusBadgeMedicao";
 import AbaDocumentos from "@/components/shared/AbaDocumentos";
+import AbaHistorico from "@/components/shared/AbaHistorico";
+import { registrarHistorico } from "@/services/historico.service";
+import { useAuth } from "@/contexts/AuthContext";
 import ModalMedicao from "./ModalMedicao";
 import { ETAPAS_OBRA, FLUXO_OBRA } from "@/constants/etapas";
 import { CIDADES, ENGENHEIROS, MODALIDADES, ORIGENS, ORIGENS_RECURSO, TIPOS_RENDA } from "@/constants/dominios";
@@ -13,7 +16,7 @@ import { fmtBRL, fmtDate, maskCPF, maskPhone } from "@/lib/utils";
 import type { Obra, Medicao, EtapaObra, EngCaixaObra, ConformidadeObra, StatusItem } from "@/types/app.types";
 import toast from "react-hot-toast";
 
-type Tab = "perfil" | "medicoes" | "documentos" | "editar";
+type Tab = "perfil" | "medicoes" | "documentos" | "historico" | "editar";
 
 // ── Helper date+hora ──────────────────────────────────────────────────────────
 function fmtDH(iso: string | null | undefined) {
@@ -42,12 +45,15 @@ function EngCaixaSection({
   onAvancar: (id: string, novaEtapa: EtapaObra) => Promise<void>;
   onClose: () => void;
 }) {
+  const { profile } = useAuth();
+  const nomeUsuario = profile?.nome ?? "Sistema";
   const [eng, setEng] = useState<EngCaixaObra>(() => ({ ...EMPTY_ENG, ...(obra.eng_caixa ?? {}) }));
   const [saving, setSaving] = useState(false);
 
   const handleStep = useCallback(async (
     field: "solicitado" | "boletoPago" | "vistoriaRealizada" | "laudoEmitido",
     dtField: "dtSolicitado" | "dtBoletoPago" | "dtVistoria" | "dtLaudo",
+    label: string,
     isLaudo = false,
   ) => {
     const current = eng[field] as StatusItem;
@@ -61,6 +67,14 @@ function EngCaixaSection({
     setSaving(true);
     try {
       await onSave({ eng_caixa: novoEng });
+      const acao = next === "concluido"
+        ? `marcou "${label}" como concluído.`
+        : `desmarcou "${label}".`;
+      await registrarHistorico({
+        obra_id: obra.id, lead_id: obra.lead_id,
+        tipo: "obras", acao,
+        usuario_nome: nomeUsuario, usuario_id: null, setor: "obras", etapa: "eng_caixa",
+      }).catch(() => {});
       if (isLaudo && next === "concluido") {
         toast.success("Laudo emitido! Avançando para Conformidade...");
         await onAvancar(obra.id, "conformidade");
@@ -71,7 +85,7 @@ function EngCaixaSection({
     } finally {
       setSaving(false);
     }
-  }, [eng, obra.id, onSave, onAvancar, onClose]);
+  }, [eng, obra.id, obra.lead_id, nomeUsuario, onSave, onAvancar, onClose]);
 
   const steps: Array<{
     field: "solicitado" | "boletoPago" | "vistoriaRealizada" | "laudoEmitido";
@@ -79,10 +93,10 @@ function EngCaixaSection({
     label: string;
     isLaudo: boolean;
   }> = [
-    { field: "solicitado",        dtField: "dtSolicitado", label: "Solicitado à Caixa", isLaudo: false },
-    { field: "boletoPago",        dtField: "dtBoletoPago", label: "Boleto Pago",         isLaudo: false },
-    { field: "vistoriaRealizada", dtField: "dtVistoria",   label: "Vistoria Realizada",  isLaudo: false },
-    { field: "laudoEmitido",      dtField: "dtLaudo",      label: "Laudo Emitido",       isLaudo: true  },
+    { field: "solicitado",        dtField: "dtSolicitado", label: "Solicitado à Caixa",  isLaudo: false },
+    { field: "boletoPago",        dtField: "dtBoletoPago", label: "Boleto Pago",          isLaudo: false },
+    { field: "vistoriaRealizada", dtField: "dtVistoria",   label: "Vistoria Realizada",   isLaudo: false },
+    { field: "laudoEmitido",      dtField: "dtLaudo",      label: "Laudo Emitido",        isLaudo: true  },
   ];
 
   return (
@@ -97,7 +111,7 @@ function EngCaixaSection({
               key={field}
               type="button"
               disabled={saving}
-              onClick={() => handleStep(field, dtField, isLaudo)}
+              onClick={() => handleStep(field, dtField, label, isLaudo)}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all cursor-pointer text-left ${
                 done
                   ? "border-emerald-300 bg-emerald-50"
@@ -145,12 +159,15 @@ function ConformidadeSection({
   obra: Obra;
   onSave: (data: Partial<Obra>) => Promise<void>;
 }) {
+  const { profile } = useAuth();
+  const nomeUsuario = profile?.nome ?? "Sistema";
   const [conf, setConf] = useState<ConformidadeObra>(() => ({ ...EMPTY_CONF, ...(obra.conformidade ?? {}) }));
   const [saving, setSaving] = useState(false);
 
   const handleStep = useCallback(async (
     field: "docsGerados" | "docsAssinados" | "docsEnviados",
     dtField: "dtDocsGerados" | "dtDocsAssinados" | "dtDocsEnviados",
+    label: string,
   ) => {
     const current = conf[field] as StatusItem;
     const next: StatusItem = current === "concluido" ? "pendente" : "concluido";
@@ -163,20 +180,28 @@ function ConformidadeSection({
     setSaving(true);
     try {
       await onSave({ id: obra.id, conformidade: novoConf });
+      const acao = next === "concluido"
+        ? `marcou "${label}" como concluído.`
+        : `desmarcou "${label}".`;
+      await registrarHistorico({
+        obra_id: obra.id, lead_id: obra.lead_id,
+        tipo: "obras", acao,
+        usuario_nome: nomeUsuario, usuario_id: null, setor: "obras", etapa: "conformidade",
+      }).catch(() => {});
     } catch {
       setConf(conf);
     } finally {
       setSaving(false);
     }
-  }, [conf, obra.id, onSave]);
+  }, [conf, obra.id, obra.lead_id, nomeUsuario, onSave]);
 
   const steps: Array<{
     field: "docsGerados" | "docsAssinados" | "docsEnviados";
     dtField: "dtDocsGerados" | "dtDocsAssinados" | "dtDocsEnviados";
     label: string;
   }> = [
-    { field: "docsGerados",   dtField: "dtDocsGerados",   label: "Formulários Gerados" },
-    { field: "docsAssinados", dtField: "dtDocsAssinados", label: "Formulários Assinados" },
+    { field: "docsGerados",   dtField: "dtDocsGerados",   label: "Formulários Gerados"         },
+    { field: "docsAssinados", dtField: "dtDocsAssinados", label: "Formulários Assinados"        },
     { field: "docsEnviados",  dtField: "dtDocsEnviados",  label: "Formulários Enviados à Caixa" },
   ];
 
@@ -192,7 +217,7 @@ function ConformidadeSection({
               key={field}
               type="button"
               disabled={saving}
-              onClick={() => handleStep(field, dtField)}
+              onClick={() => handleStep(field, dtField, label)}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all cursor-pointer text-left ${
                 done
                   ? "border-emerald-300 bg-emerald-50"
@@ -273,7 +298,7 @@ export default function ModalObra({ obra, onClose, onSave, onAvancar, onSalvarMe
 
   const tabs: [Tab, string][] = isNovo
     ? [["editar", "Dados"]]
-    : [["perfil", "Perfil"], ["medicoes", "Medições"], ["documentos", "Documentos"], ["editar", "Editar"]];
+    : [["perfil", "Perfil"], ["medicoes", "Medições"], ["documentos", "Documentos"], ["historico", "Histórico"], ["editar", "Editar"]];
 
   const medicoes = obra?.medicoes ?? [];
   const ETAPAS_POS_CONTRATO = new Set(["contrato", "execucao", "entregue"]);
@@ -482,6 +507,14 @@ export default function ModalObra({ obra, onClose, onSave, onAvancar, onSalvarMe
               dependente={obra.dependente}
               tipoRenda={obra.tipo_renda}
               fgts3anos={obra.fgts_3anos}
+            />
+          )}
+
+          {/* ── HISTÓRICO ───────────────────────────────────────────────────── */}
+          {tab === "historico" && obra && (
+            <AbaHistorico
+              leadId={obra.lead_id ?? undefined}
+              obraId={obra.id}
             />
           )}
 

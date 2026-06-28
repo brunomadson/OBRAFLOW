@@ -1,10 +1,20 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { getObras, createObra, updateObra, registrarLogObra, upsertMedicao, deleteMedicao } from "@/services/obras.service";
+import { registrarHistorico } from "@/services/historico.service";
+import { useAuth } from "@/contexts/AuthContext";
+import { ETAPAS_OBRA } from "@/constants/etapas";
+import { STATUS_MEDICAO_LABEL } from "@/constants/dominios";
 import type { Obra, Medicao, EtapaObra } from "@/types/app.types";
 import toast from "react-hot-toast";
 
+function labelEtapaObra(etapa: string) {
+  return ETAPAS_OBRA.find((e) => e.id === etapa)?.label ?? etapa;
+}
+
 export function useObras() {
+  const { profile } = useAuth();
+  const nomeUsuario = profile?.nome ?? "Sistema";
   const [obras, setObras] = useState<Obra[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -44,6 +54,7 @@ export function useObras() {
 
   const avancarEtapa = useCallback(async (obra: Obra, novaEtapa: EtapaObra): Promise<void> => {
     try {
+      const etapaAnterior = obra.etapa;
       await updateObra(obra.id, { etapa: novaEtapa });
       await registrarLogObra(obra.id, novaEtapa);
       setObras((prev) =>
@@ -53,13 +64,24 @@ export function useObras() {
             : o
         )
       );
+      const acaoText = `moveu o cliente de "${labelEtapaObra(etapaAnterior)}" para "${labelEtapaObra(novaEtapa)}".`;
+      await registrarHistorico({
+        obra_id: obra.id, lead_id: obra.lead_id,
+        tipo: "obras", acao: acaoText,
+        usuario_nome: nomeUsuario, usuario_id: null, setor: "obras", etapa: novaEtapa,
+      }).catch(() => {});
       toast.success(`Obra avançada para ${novaEtapa}`);
     } catch {
       toast.error("Erro ao avançar etapa");
     }
-  }, []);
+  }, [nomeUsuario]);
 
   const salvarMedicao = useCallback(async (obraId: string, medicao: Partial<Medicao>): Promise<Medicao | null> => {
+    const isNova = !medicao.id;
+    const obra = obras.find((o) => o.id === obraId);
+    const medicaoAntiga = obra?.medicoes?.find((m) => m.id === medicao.id);
+    const statusAntigo = medicaoAntiga?.status;
+
     try {
       const salva = await upsertMedicao({ ...medicao, obra_id: obraId });
       setObras((prev) =>
@@ -75,16 +97,46 @@ export function useObras() {
           };
         })
       );
+      const nomeMed = salva.nome || "Medição";
+
+      if (isNova) {
+        await registrarHistorico({
+          obra_id: obraId, lead_id: obra?.lead_id ?? null,
+          tipo: "medicao", acao: `criou a Medição "${nomeMed}".`,
+          usuario_nome: nomeUsuario, usuario_id: null, setor: "obras", etapa: obra?.etapa ?? null,
+        }).catch(() => {});
+      } else {
+        // Registra mudança de status se houver
+        if (medicao.status && medicao.status !== statusAntigo) {
+          const labelAntigo = STATUS_MEDICAO_LABEL[statusAntigo ?? ""] ?? statusAntigo ?? "—";
+          const labelNovo = STATUS_MEDICAO_LABEL[medicao.status] ?? medicao.status;
+          await registrarHistorico({
+            obra_id: obraId, lead_id: obra?.lead_id ?? null,
+            tipo: "medicao",
+            acao: `alterou o status da Medição "${nomeMed}" de "${labelAntigo}" para "${labelNovo}".`,
+            usuario_nome: nomeUsuario, usuario_id: null, setor: "obras", etapa: obra?.etapa ?? null,
+          }).catch(() => {});
+        } else {
+          await registrarHistorico({
+            obra_id: obraId, lead_id: obra?.lead_id ?? null,
+            tipo: "medicao", acao: `atualizou os dados da Medição "${nomeMed}".`,
+            usuario_nome: nomeUsuario, usuario_id: null, setor: "obras", etapa: obra?.etapa ?? null,
+          }).catch(() => {});
+        }
+      }
+
       return salva;
     } catch (err) {
       const msg = (err as { message?: string })?.message ?? "Erro desconhecido";
       toast.error(`Erro ao salvar medição: ${msg}`);
-      throw err; // re-lança para o caller saber que falhou
+      throw err;
     }
-  }, []);
+  }, [obras, nomeUsuario]);
 
   const removerMedicao = useCallback(async (obraId: string, medicaoId: string): Promise<void> => {
     try {
+      const obra = obras.find((o) => o.id === obraId);
+      const medicao = obra?.medicoes?.find((m) => m.id === medicaoId);
       await deleteMedicao(medicaoId);
       setObras((prev) =>
         prev.map((o) =>
@@ -93,11 +145,16 @@ export function useObras() {
             : o
         )
       );
+      await registrarHistorico({
+        obra_id: obraId, lead_id: obra?.lead_id ?? null,
+        tipo: "medicao", acao: `removeu a Medição "${medicao?.nome ?? "Medição"}".`,
+        usuario_nome: nomeUsuario, usuario_id: null, setor: "obras", etapa: obra?.etapa ?? null,
+      }).catch(() => {});
       toast.success("Medição removida");
     } catch {
       toast.error("Erro ao remover medição");
     }
-  }, []);
+  }, [obras, nomeUsuario]);
 
   return { obras, loading, salvar, avancarEtapa, salvarMedicao, removerMedicao, reload: load };
 }

@@ -2,10 +2,19 @@
 import { useState, useEffect, useCallback } from "react";
 import { getLeads, createLead, updateLead, registrarLogLead } from "@/services/leads.service";
 import { createObra, registrarLogObra } from "@/services/obras.service";
+import { registrarHistorico } from "@/services/historico.service";
+import { useAuth } from "@/contexts/AuthContext";
+import { ETAPAS_LEAD } from "@/constants/etapas";
 import type { Lead, EtapaLead } from "@/types/app.types";
 import toast from "react-hot-toast";
 
+function labelEtapaLead(etapa: string) {
+  return ETAPAS_LEAD.find((e) => e.id === etapa)?.label ?? etapa;
+}
+
 export function useLeads() {
+  const { profile } = useAuth();
+  const nomeUsuario = profile?.nome ?? "Sistema";
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -28,11 +37,21 @@ export function useLeads() {
       if (lead.id) {
         const atualizado = await updateLead(lead.id, lead);
         setLeads((prev) => prev.map((l) => (l.id === atualizado.id ? { ...l, ...atualizado } : l)));
+        await registrarHistorico({
+          lead_id: lead.id, obra_id: null,
+          tipo: "comercial", acao: "editou as informações do cliente.",
+          usuario_nome: nomeUsuario, usuario_id: null, setor: "comercial", etapa: lead.etapa ?? null,
+        }).catch(() => {});
         toast.success("Lead atualizado!");
         return atualizado;
       } else {
         const novo = await createLead(lead as never);
         await registrarLogLead(novo.id, "leads");
+        await registrarHistorico({
+          lead_id: novo.id, obra_id: null,
+          tipo: "lead", acao: "criou o Lead.",
+          usuario_nome: nomeUsuario, usuario_id: null, setor: "comercial", etapa: "leads",
+        }).catch(() => {});
         setLeads((prev) => [novo, ...prev]);
         toast.success("Lead cadastrado!");
         return novo;
@@ -41,11 +60,13 @@ export function useLeads() {
       toast.error("Erro ao salvar lead");
       return null;
     }
-  }, []);
+  }, [nomeUsuario]);
 
   const avancarEtapa = useCallback(
     async (leadId: string, novaEtapa: EtapaLead, dadosExtras: Record<string, unknown> = {}): Promise<Lead | null> => {
       try {
+        const leadAtual = leads.find((l) => l.id === leadId);
+        const etapaAnterior = leadAtual?.etapa;
         const atualizado = await updateLead(leadId, { etapa: novaEtapa, ...dadosExtras });
         await registrarLogLead(leadId, novaEtapa, dadosExtras);
         const logEntry = { id: "", lead_id: leadId, etapa: novaEtapa, dados_extras: dadosExtras, created_at: new Date().toISOString() };
@@ -56,6 +77,14 @@ export function useLeads() {
               : l
           )
         );
+        const acaoText = etapaAnterior
+          ? `moveu o cliente de "${labelEtapaLead(etapaAnterior)}" para "${labelEtapaLead(novaEtapa)}".`
+          : `moveu o cliente para "${labelEtapaLead(novaEtapa)}".`;
+        await registrarHistorico({
+          lead_id: leadId, obra_id: null,
+          tipo: "comercial", acao: acaoText,
+          usuario_nome: nomeUsuario, usuario_id: null, setor: "comercial", etapa: novaEtapa,
+        }).catch(() => {});
         toast.success(`Lead avançado para ${novaEtapa}`);
         return atualizado;
       } catch {
@@ -63,7 +92,7 @@ export function useLeads() {
         return null;
       }
     },
-    []
+    [leads, nomeUsuario]
   );
 
   const enviarParaObras = useCallback(async (leadId: string): Promise<boolean> => {
@@ -113,6 +142,16 @@ export function useLeads() {
 
       // Registra log inicial da etapa "projeto" (trigger só dispara em UPDATE)
       await registrarLogObra(novaObra.id, "projeto").catch(() => {});
+      await registrarHistorico({
+        lead_id: leadId, obra_id: novaObra.id,
+        tipo: "comercial", acao: "enviou o cliente para o setor Obras.",
+        usuario_nome: nomeUsuario, usuario_id: null, setor: "comercial", etapa: "aprovada",
+      }).catch(() => {});
+      await registrarHistorico({
+        lead_id: leadId, obra_id: novaObra.id,
+        tipo: "obras", acao: "cliente chegou ao setor Obras na etapa Projeto.",
+        usuario_nome: "Sistema", usuario_id: null, setor: "obras", etapa: "projeto",
+      }).catch(() => {});
 
       // 2. Marca o lead como enviado
       await updateLead(leadId, {
@@ -135,7 +174,7 @@ export function useLeads() {
       toast.error("Erro ao enviar para Obras");
       return false;
     }
-  }, [leads]);
+  }, [leads, nomeUsuario]);
 
   const enviarParaObrasReload = useCallback(async (leadId: string, reloadObras?: () => void): Promise<boolean> => {
     const ok = await enviarParaObras(leadId);

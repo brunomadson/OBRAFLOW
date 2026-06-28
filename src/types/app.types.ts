@@ -295,6 +295,22 @@ export interface Documento {
   ativo: boolean;
 }
 
+// ─── Domínio: Histórico ───────────────────────────────────────────────────────
+export type TipoHistorico = "lead" | "comercial" | "obras" | "documento" | "medicao" | "sistema";
+
+export interface Historico {
+  id: string;
+  lead_id: string | null;
+  obra_id: string | null;
+  tipo: TipoHistorico;
+  acao: string;
+  usuario_id: string | null;
+  usuario_nome: string;
+  setor: string | null;
+  etapa: string | null;
+  created_at: string;
+}
+
 // ─── Domínio: Notificações ────────────────────────────────────────────────────
 export type TipoNotificacao = "critico" | "alerta" | "info";
 export type SetorNotificacao = "comercial" | "obras" | "financeiro";

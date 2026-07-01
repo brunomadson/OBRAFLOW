@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    "prepare": "husky install"
+    "prepare": "husky"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

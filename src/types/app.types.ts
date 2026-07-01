@@ -24,19 +24,21 @@ export interface Cidade {
   id: string;
   nome: string;
   ativo: boolean;
+  workspace_id?: string | null;
 }
 
 // ─── Domínio: Correspondente ──────────────────────────────────────────────────
 export interface Correspondente {
   id: string;
-  nome: string;       // nome da pessoa (ex: Genilza)
-  agencia: string | null; // agência (ex: Agência Presidente Dutra)
-  contato: string | null; // telefone
+  nome: string;
+  agencia: string | null;
+  contato: string | null;
   email: string | null;
   cidade: string | null;
   banco: string | null;
   ativo: boolean;
   obs: string | null;
+  workspace_id?: string | null;
 }
 
 // ─── Domínio: Corretor ────────────────────────────────────────────────────────
@@ -46,6 +48,7 @@ export interface Corretor {
   telefone: string | null;
   email: string | null;
   ativo: boolean;
+  workspace_id?: string | null;
 }
 
 // ─── Domínio: Lead ────────────────────────────────────────────────────────────
@@ -103,6 +106,7 @@ export interface Lead {
   enviado_para_obras: boolean;
   data_envio_obras: string | null;
   correspondente_id: string | null;
+  workspace_id?: string | null;
   created_at: string;
   updated_at: string;
   // joins
@@ -244,6 +248,7 @@ export interface Obra {
   progresso: number;
   pls: string | null;
   obs: string | null;
+  workspace_id?: string | null;
   projeto: ProjetoObra;
   licencas: LicencasObra;
   eng_caixa: EngCaixaObra;
@@ -276,6 +281,7 @@ export interface Lancamento {
   parcela_num: number | null;
   parcela_total: number | null;
   obs: string | null;
+  workspace_id?: string | null;
   created_at: string;
 }
 
@@ -290,9 +296,10 @@ export interface Documento {
   tamanho_bytes: number | null;
   mime_type: string | null;
   storage_path: string;
-  created_at: string;
   usuario_id: string | null;
   ativo: boolean;
+  workspace_id?: string | null;
+  created_at: string;
 }
 
 // ─── Domínio: Histórico ───────────────────────────────────────────────────────
@@ -308,6 +315,7 @@ export interface Historico {
   usuario_nome: string;
   setor: string | null;
   etapa: string | null;
+  workspace_id?: string | null;
   created_at: string;
 }
 

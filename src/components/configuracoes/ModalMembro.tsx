@@ -66,7 +66,7 @@ export default function ModalMembro({ membro, onClose, onSave }: Props) {
           email: email.trim().toLowerCase(),
           options: {
             shouldCreateUser: true,
-            emailRedirectTo: `${window.location.origin}/aceitar-convite`,
+            emailRedirectTo: `${window.location.origin}/auth/callback?next=/aceitar-convite`,
           },
         });
 

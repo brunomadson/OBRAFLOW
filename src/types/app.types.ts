@@ -10,6 +10,7 @@ export interface Profile {
   status: UserStatus;
   cor: string;
   setores: string[];
+  workspace_id?: string | null;
 }
 
 // ─── Domínio: Etapas ──────────────────────────────────────────────────────────

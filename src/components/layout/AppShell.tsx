@@ -9,7 +9,7 @@ import { useNotificacoes } from "@/hooks/useNotificacoes";
 import { CONFIG_PADRAO } from "@/constants/config";
 
 export default function AppShell({ children }: { children: ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, profile, loading } = useAuth();
   const router = useRouter();
   const { leads } = useLeads();
   const { obras } = useObras();
@@ -18,10 +18,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const notifCount = notifs.filter((n) => n.tipo === "critico").length;
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.push("/login");
-    }
-  }, [user, loading, router]);
+    if (loading) return;
+    if (!user) { router.push("/login"); return; }
+    if (!profile?.workspace_id) { router.push("/onboarding"); }
+  }, [user, profile, loading, router]);
 
   if (loading) {
     return (

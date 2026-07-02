@@ -32,7 +32,11 @@ export async function createWorkspaceAndLink(data: {
 
   const { error: pErr } = await supabase
     .from("profiles")
-    .update({ workspace_id: workspaceId } as never)
+    .update({
+      workspace_id: workspaceId,
+      cargo: "CEO / Dono",
+      setores: ["comercial", "obras", "financeiro", "configuracoes"],
+    } as never)
     .eq("id", user.id);
 
   if (pErr) throw pErr;

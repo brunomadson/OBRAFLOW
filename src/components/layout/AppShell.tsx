@@ -1,16 +1,18 @@
 "use client";
 import { useEffect, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Sidebar from "./Sidebar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLeads } from "@/hooks/useLeads";
 import { useObras } from "@/hooks/useObras";
 import { useNotificacoes } from "@/hooks/useNotificacoes";
 import { CONFIG_PADRAO } from "@/constants/config";
+import { getSetorInicial } from "@/lib/utils";
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const { user, profile, loading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const { leads } = useLeads();
   const { obras } = useObras();
   const notifs = useNotificacoes(leads, obras, CONFIG_PADRAO, []);
@@ -20,8 +22,16 @@ export default function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (loading) return;
     if (!user) { router.push("/login"); return; }
-    if (!profile?.workspace_id) { router.push("/onboarding"); }
-  }, [user, profile, loading, router]);
+    if (!profile?.workspace_id) { router.push("/onboarding"); return; }
+
+    // CEO/Dono tem acesso a todos os setores. Demais usuários só acessam
+    // os setores liberados no profile — protege contra acesso direto por URL.
+    const isDono = profile.cargo === "CEO / Dono";
+    const setorAtual = pathname.split("/")[1];
+    if (!isDono && setorAtual && !profile.setores?.includes(setorAtual)) {
+      router.push(`/${getSetorInicial(profile)}`);
+    }
+  }, [user, profile, loading, pathname, router]);
 
   if (loading) {
     return (

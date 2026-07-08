@@ -40,11 +40,12 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
-  const isAuthPage   = pathname.startsWith("/login");
+  const isAuthPage   = pathname.startsWith("/login") || pathname.startsWith("/cadastro");
   const isPublicPage =
     pathname === "/" ||
     pathname.startsWith("/auth/callback") ||
     pathname.startsWith("/aceitar-convite") ||
+    pathname.startsWith("/cadastro") ||
     pathname.startsWith("/onboarding");
 
   if (!user && !isAuthPage && !isPublicPage) {

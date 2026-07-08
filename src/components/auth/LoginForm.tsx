@@ -1,7 +1,9 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { getSetorInicial } from "@/lib/utils";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import toast from "react-hot-toast";
@@ -22,13 +24,25 @@ export default function LoginForm() {
       return;
     }
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       toast.error("Credenciais inválidas. Verifique e tente novamente.");
-    } else {
-      toast.success("Bem-vindo!");
-      router.push("/comercial");
+      setLoading(false);
+      return;
     }
+
+    let destino = "/comercial";
+    if (data.user) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("cargo, setores, workspace_id")
+        .eq("id", data.user.id)
+        .single<{ cargo: string; setores: string[]; workspace_id: string | null }>();
+      destino = profile?.workspace_id ? `/${getSetorInicial(profile)}` : "/onboarding";
+    }
+
+    toast.success("Bem-vindo!");
+    router.push(destino);
     setLoading(false);
   };
 
@@ -115,6 +129,15 @@ export default function LoginForm() {
       >
         {mode === "login" ? "Esqueci minha senha" : "← Voltar para o login"}
       </button>
+
+      {mode === "login" && (
+        <Link
+          href="/cadastro"
+          className="mt-2 text-xs text-slate-500 hover:text-slate-300 block text-center transition-colors"
+        >
+          Não tem conta? Cadastre-se
+        </Link>
+      )}
     </div>
   );
 }

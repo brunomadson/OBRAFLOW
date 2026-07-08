@@ -1,8 +1,19 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { SETORES_NAV } from "@/constants/dominios";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
+}
+
+// ─── Setores / Acesso ─────────────────────────────────────────────────────────
+// CEO/Dono tem acesso a todos os setores automaticamente (ver workspaces.service.ts).
+// Para os demais, retorna o primeiro setor liberado na ordem de navegação.
+export function getSetorInicial(profile: { cargo?: string | null; setores?: string[] | null } | null | undefined): string {
+  if (!profile) return "comercial";
+  if (profile.cargo === "CEO / Dono") return "comercial";
+  const primeiro = SETORES_NAV.find((s) => profile.setores?.includes(s.id));
+  return primeiro?.id ?? "comercial";
 }
 
 // ─── Formatação ───────────────────────────────────────────────────────────────

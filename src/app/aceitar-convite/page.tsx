@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { getSetorInicial } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
@@ -54,13 +55,10 @@ export default function AceitarConvitePage() {
     if (user) {
       const { data: profile } = await supabase
         .from("profiles")
-        .select("setores")
+        .select("cargo, setores")
         .eq("id", user.id)
-        .single();
-      const primeiroSetor = (profile?.setores as string[] | null)?.[0];
-      if (primeiroSetor && primeiroSetor !== "configuracoes") {
-        destino = `/${primeiroSetor}`;
-      }
+        .single<{ cargo: string; setores: string[] }>();
+      destino = `/${getSetorInicial(profile)}`;
     }
 
     toast.success("Senha criada! Bem-vindo ao ObraFlow.");

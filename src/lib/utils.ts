@@ -6,6 +6,25 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+// ─── Ordenação de tabelas ─────────────────────────────────────────────────────
+export type SortDir = "asc" | "desc";
+export interface SortState<K extends string> { key: K; dir: SortDir }
+
+// Clique na mesma coluna inverte a direção; clique em coluna nova começa em "asc".
+export function nextSort<K extends string>(current: SortState<K> | null, key: K): SortState<K> {
+  if (current?.key === key) return { key, dir: current.dir === "asc" ? "desc" : "asc" };
+  return { key, dir: "asc" };
+}
+
+// Compara strings (PT-BR, sem case) e números uniformemente; nulos sempre por último.
+export function compareValues(a: unknown, b: unknown): number {
+  if (a == null && b == null) return 0;
+  if (a == null) return 1;
+  if (b == null) return -1;
+  if (typeof a === "number" && typeof b === "number") return a - b;
+  return String(a).localeCompare(String(b), "pt-BR", { numeric: true, sensitivity: "base" });
+}
+
 // ─── Setores / Acesso ─────────────────────────────────────────────────────────
 // CEO/Dono tem acesso a todos os setores automaticamente (ver workspaces.service.ts).
 // Para os demais, retorna o primeiro setor liberado na ordem de navegação.

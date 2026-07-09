@@ -1,7 +1,8 @@
 "use client";
+import { useMemo, useState } from "react";
 import { ETAPAS_LEAD } from "@/constants/etapas";
 import Badge from "@/components/ui/Badge";
-import { fmtBRL } from "@/lib/utils";
+import { cn, compareValues, fmtBRL, nextSort, type SortState } from "@/lib/utils";
 import type { Lead } from "@/types/app.types";
 
 interface Props {
@@ -9,8 +10,46 @@ interface Props {
   onEdit: (lead: Lead) => void;
 }
 
+type SortKey = "nome" | "cidade" | "etapa" | "renda_bruta" | "valor_caixa" | "valor_venda" | "valor_subsidio" | "responsavel" | "updated_at";
+
+const ETAPA_ORDEM: Record<string, number> = Object.fromEntries(ETAPAS_LEAD.map((e, i) => [e.id, i]));
+
+function sortValue(lead: Lead, key: SortKey): string | number | null {
+  switch (key) {
+    case "nome":            return lead.nome;
+    case "cidade":          return lead.cidade;
+    case "etapa":           return ETAPA_ORDEM[lead.etapa] ?? -1;
+    case "renda_bruta":     return lead.renda_bruta;
+    case "valor_caixa":     return lead.valor_caixa;
+    case "valor_venda":     return lead.valor_venda;
+    case "valor_subsidio":  return lead.valor_subsidio;
+    case "responsavel":     return lead.responsavel?.nome ?? null;
+    case "updated_at":      return lead.updated_at ? new Date(lead.updated_at).getTime() : null;
+  }
+}
+
+const COLUNAS: { key: SortKey; label: string }[] = [
+  { key: "nome",           label: "Cliente" },
+  { key: "cidade",         label: "Cidade" },
+  { key: "etapa",          label: "Etapa" },
+  { key: "renda_bruta",    label: "Renda" },
+  { key: "valor_caixa",    label: "Vl. Caixa" },
+  { key: "valor_venda",    label: "Vl. Venda" },
+  { key: "valor_subsidio", label: "Subsídio" },
+  { key: "responsavel",    label: "Responsável" },
+  { key: "updated_at",     label: "Mov." },
+];
+
 export default function TabelaPropostas({ leads, onEdit }: Props) {
   const ativos = leads.filter((l) => !["reprovada", "leads"].includes(l.etapa));
+  const [sort, setSort] = useState<SortState<SortKey> | null>(null);
+
+  const linhas = useMemo(() => {
+    if (!sort) return ativos;
+    const mult = sort.dir === "asc" ? 1 : -1;
+    return [...ativos].sort((a, b) => mult * compareValues(sortValue(a, sort.key), sortValue(b, sort.key)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ativos, sort]);
 
   return (
     <div className="card overflow-hidden">
@@ -18,20 +57,27 @@ export default function TabelaPropostas({ leads, onEdit }: Props) {
         <table className="w-full border-collapse text-[13px]">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-100">
-              {["Cliente", "Cidade", "Etapa", "Renda", "Vl. Caixa", "Vl. Venda", "Subsídio", "Responsável", "Mov.", ""].map(
-                (h) => (
-                  <th
-                    key={h}
-                    className="px-3.5 py-2.5 text-left text-[11px] font-bold text-slate-500 tracking-wide whitespace-nowrap"
+              {COLUNAS.map((c) => (
+                <th key={c.key} className="px-3.5 py-2.5 text-left whitespace-nowrap">
+                  <button
+                    type="button"
+                    onClick={() => setSort((s) => nextSort(s, c.key))}
+                    className={cn(
+                      "flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer",
+                      "text-[11px] font-bold tracking-wide transition-colors",
+                      sort?.key === c.key ? "text-blue-600" : "text-slate-500 hover:text-slate-800"
+                    )}
                   >
-                    {h}
-                  </th>
-                )
-              )}
+                    {c.label}
+                    <span className="text-[9px]">{sort?.key === c.key ? (sort.dir === "asc" ? "▲" : "▼") : ""}</span>
+                  </button>
+                </th>
+              ))}
+              <th className="px-3.5 py-2.5" />
             </tr>
           </thead>
           <tbody>
-            {ativos.map((lead, i) => {
+            {linhas.map((lead, i) => {
               const etapa = ETAPAS_LEAD.find((e) => e.id === lead.etapa);
               return (
                 <tr

@@ -2,7 +2,7 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useFinanceiro } from "@/hooks/useFinanceiro";
 import { getObras } from "@/services/obras.service";
-import { fmtBRL, fmtDate } from "@/lib/utils";
+import { cn, compareValues, fmtBRL, fmtDate, nextSort, type SortState } from "@/lib/utils";
 import Button from "@/components/ui/Button";
 import Modal, { ModalHeader } from "@/components/ui/Modal";
 import { SkeletonTable } from "@/components/ui/Skeleton";
@@ -1037,6 +1037,35 @@ function TabDRE({ lancamentos }: { lancamentos: Lancamento[] }) {
 }
 
 /* ─── Tab Lançamentos ────────────────────────────────────────────────────────── */
+type LancSortKey = "data" | "categoria" | "descricao" | "obra" | "forma_pagamento" | "data_vencimento" | "status" | "valor";
+
+const LANC_COLUNAS: { key: LancSortKey; label: string }[] = [
+  { key: "data",            label: "Data" },
+  { key: "categoria",       label: "Categoria" },
+  { key: "descricao",       label: "Descrição" },
+  { key: "obra",            label: "Obra" },
+  { key: "forma_pagamento", label: "Forma Pgto" },
+  { key: "data_vencimento", label: "Vencimento" },
+  { key: "status",          label: "Status" },
+  { key: "valor",           label: "Valor" },
+];
+
+const STATUS_ORDEM: Record<StatusPagamento, number> = { pago: 0, pendente: 1, vencido: 2 };
+
+function lancSortValue(l: Lancamento, key: LancSortKey, obras: Obra[]): string | number | null {
+  switch (key) {
+    case "data":            return l.data ? new Date(l.data).getTime() : null;
+    case "categoria":       return l.categoria;
+    case "descricao":       return l.descricao;
+    case "obra":            return obras.find((o) => o.id === l.obra_id)?.nome ?? null;
+    case "forma_pagamento": return l.forma_pagamento;
+    case "data_vencimento": return l.data_vencimento ? new Date(l.data_vencimento).getTime() : null;
+    case "status":          return STATUS_ORDEM[statusReal(l)];
+    // Saídas contam como negativo, assim "maior" e "menor" refletem o impacto no caixa.
+    case "valor":           return l.tipo === "entrada" ? l.valor : -l.valor;
+  }
+}
+
 function TabLancamentos({ lancamentos, obras, onEditar, onRemover, onPagar }: {
   lancamentos: Lancamento[];
   obras: Obra[];
@@ -1048,6 +1077,7 @@ function TabLancamentos({ lancamentos, obras, onEditar, onRemover, onPagar }: {
   const [obraF, setObraF]   = useState("");
   const [busca, setBusca]   = useState("");
   const [statusF, setStatusF] = useState<"todos" | StatusPagamento>("todos");
+  const [sort, setSort] = useState<SortState<LancSortKey> | null>(null);
 
   const filtrados = useMemo(() => lancamentos.filter((l) => {
     if (tipo !== "todos" && l.tipo !== tipo) return false;
@@ -1059,6 +1089,12 @@ function TabLancamentos({ lancamentos, obras, onEditar, onRemover, onPagar }: {
   }), [lancamentos, tipo, obraF, statusF, busca]);
 
   const totalFilt = filtrados.reduce((s, l) => s + (l.tipo === "entrada" ? l.valor : -l.valor), 0);
+
+  const ordenados = useMemo(() => {
+    if (!sort) return filtrados;
+    const mult = sort.dir === "asc" ? 1 : -1;
+    return [...filtrados].sort((a, b) => mult * compareValues(lancSortValue(a, sort.key, obras), lancSortValue(b, sort.key, obras)));
+  }, [filtrados, sort, obras]);
 
   return (
     <div className="space-y-3">
@@ -1097,13 +1133,27 @@ function TabLancamentos({ lancamentos, obras, onEditar, onRemover, onPagar }: {
         <table className="w-full border-collapse text-[12px]">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-100">
-              {["Data", "Categoria", "Descrição", "Obra", "Forma Pgto", "Vencimento", "Status", "Valor", ""].map((h) => (
-                <th key={h} className="px-3 py-2.5 text-left text-[10px] font-bold text-slate-500 tracking-wide whitespace-nowrap">{h}</th>
+              {LANC_COLUNAS.map((c) => (
+                <th key={c.key} className="px-3 py-2.5 text-left whitespace-nowrap">
+                  <button
+                    type="button"
+                    onClick={() => setSort((s) => nextSort(s, c.key))}
+                    className={cn(
+                      "flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer",
+                      "text-[10px] font-bold tracking-wide transition-colors",
+                      sort?.key === c.key ? "text-blue-600" : "text-slate-500 hover:text-slate-800"
+                    )}
+                  >
+                    {c.label}
+                    <span className="text-[9px]">{sort?.key === c.key ? (sort.dir === "asc" ? "▲" : "▼") : ""}</span>
+                  </button>
+                </th>
               ))}
+              <th className="px-3 py-2.5" />
             </tr>
           </thead>
           <tbody>
-            {filtrados.map((l, i) => {
+            {ordenados.map((l, i) => {
               const obra = obras.find((o) => o.id === l.obra_id);
               const st   = statusReal(l);
               const isParc = l.parcela_total && l.parcela_total > 1;

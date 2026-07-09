@@ -525,7 +525,9 @@ function PizzaVencimentos({ saidas, onClickFatia }: {
   const CX = 70, CY = 70, R = 52, ri = 30;
   let cumulAngle = -Math.PI / 2;
   const paths = fatias.map((f) => {
-    const angle = (f.valor / total) * 2 * Math.PI;
+    // Clamp abaixo de 360°: quando uma única fatia é 100% do total, o arco SVG
+    // termina exatamente onde começou e o comando "A" não desenha nada.
+    const angle = Math.min((f.valor / total) * 2 * Math.PI, 2 * Math.PI - 0.001);
     const x1 = CX + R * Math.cos(cumulAngle);
     const y1 = CY + R * Math.sin(cumulAngle);
     cumulAngle += angle;

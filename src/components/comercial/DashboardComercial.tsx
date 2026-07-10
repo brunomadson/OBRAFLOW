@@ -2,6 +2,7 @@
 import { useState, useMemo } from "react";
 import { ETAPAS_LEAD } from "@/constants/etapas";
 import { fmtBRL } from "@/lib/utils";
+import Badge from "@/components/ui/Badge";
 import type { Lead } from "@/types/app.types";
 
 interface Props {
@@ -40,82 +41,77 @@ function KPI({ label, valor, varPct, meta }: { label: string; valor: string | nu
 
 const PERIODOS: [string, string][] = [["7","7D"],["30","30D"],["90","90D"],["180","180D"],["365","360D"]];
 
-/* ─── Gráfico Pizza: Leads por Corretor ─────────────────────────────────── */
-const PIZZA_CORES = ["#3B82F6","#10B981","#F59E0B","#8B5CF6","#F97316","#EF4444","#06B6D4","#6366F1"];
+/* ─── Geradores de Negócio: Corretores parceiros & Indicações pessoais ──────
+   Mede quem traz oportunidades de verdade (parceiros e pessoas), não canal
+   de marketing — por isso ignora Instagram/Tráfego pago/Captação ativa/etc. */
+function GeradoresNegocio({ leads }: { leads: Lead[] }) {
+  const geradores = useMemo(() => {
+    const map: Record<string, { nome: string; tipo: "Corretor" | "Indicação"; leads: number; aprovados: number }> = {};
 
-function PizzaCorretores({ leads }: { leads: Lead[] }) {
-  const dados = useMemo(() => {
-    const map: Record<string, number> = {};
     leads.forEach((l) => {
-      if (l.origem === "Corretor" && l.corretor) {
-        map[l.corretor] = (map[l.corretor] || 0) + 1;
-      } else if (l.origem !== "Corretor") {
-        map[l.origem] = (map[l.origem] || 0) + 1;
-      } else {
-        map["Corretor s/ nome"] = (map["Corretor s/ nome"] || 0) + 1;
+      let nome: string | null = null;
+      let tipo: "Corretor" | "Indicação" | null = null;
+
+      if (l.origem === "Corretor") {
+        nome = l.corretor?.trim() || "Corretor sem nome";
+        tipo = "Corretor";
+      } else if (l.origem === "Indicação") {
+        nome = l.indicado_por?.trim() || "Indicação sem nome";
+        tipo = "Indicação";
       }
+      if (!nome || !tipo) return; // ignora canais de marketing (Instagram, Tráfego pago, etc.)
+
+      const key = `${tipo}:${nome}`;
+      if (!map[key]) map[key] = { nome, tipo, leads: 0, aprovados: 0 };
+      map[key].leads += 1;
+      if (l.etapa === "aprovada") map[key].aprovados += 1;
     });
-    return Object.entries(map).sort((a, b) => b[1] - a[1]);
+
+    return Object.values(map).sort((a, b) => b.leads - a.leads);
   }, [leads]);
 
-  const total = dados.reduce((s, [, c]) => s + c, 0);
-
-  if (total === 0) return null;
-
-  // Calcular fatias SVG
-  const R = 60; // raio
-  const cx = 80; const cy = 80;
-  let startAngle = -Math.PI / 2;
-  const slices = dados.map(([label, count], i) => {
-    const frac  = count / total;
-    const angle = frac * 2 * Math.PI;
-    const x1 = cx + R * Math.cos(startAngle);
-    const y1 = cy + R * Math.sin(startAngle);
-    startAngle += angle;
-    const x2 = cx + R * Math.cos(startAngle);
-    const y2 = cy + R * Math.sin(startAngle);
-    const large = angle > Math.PI ? 1 : 0;
-    const path = frac === 1
-      ? `M ${cx} ${cy - R} A ${R} ${R} 0 1 1 ${cx - 0.01} ${cy - R} Z`
-      : `M ${cx} ${cy} L ${x1} ${y1} A ${R} ${R} 0 ${large} 1 ${x2} ${y2} Z`;
-    return { label, count, frac, path, cor: PIZZA_CORES[i % PIZZA_CORES.length] };
-  });
+  const maxLeads = Math.max(...geradores.map((g) => g.leads), 1);
+  const totalLeads = geradores.reduce((s, g) => s + g.leads, 0);
 
   return (
     <div className="card p-5 mb-5">
-      <p className="text-[13px] font-bold text-slate-900 mb-4">Leads por Origem / Corretor</p>
-      <div className="flex items-center gap-8">
-        {/* SVG donut */}
-        <svg width="160" height="160" viewBox="0 0 160 160" className="flex-shrink-0">
-          {slices.map((s, i) => (
-            <path key={i} d={s.path} fill={s.cor} stroke="#fff" strokeWidth="2">
-              <title>{s.label}: {s.count}</title>
-            </path>
-          ))}
-          {/* buraco central */}
-          <circle cx={cx} cy={cy} r={R * 0.52} fill="#fff" />
-          <text x={cx} y={cy - 4} textAnchor="middle" fontSize="16" fontWeight="800" fill="#0F172A">{total}</text>
-          <text x={cx} y={cy + 13} textAnchor="middle" fontSize="9" fill="#94A3B8">leads</text>
-        </svg>
-        {/* Legenda */}
-        <div className="flex-1 space-y-2">
-          {slices.map((s) => (
-            <div key={s.label} className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: s.cor }} />
-                <span className="text-xs text-slate-700 truncate">{s.label}</span>
-              </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <div className="w-20 bg-slate-100 rounded h-1.5">
-                  <div className="h-1.5 rounded" style={{ background: s.cor, width: `${s.frac * 100}%` }} />
+      <p className="text-[13px] font-bold text-slate-900 mb-1">Geradores de Negócio</p>
+      <p className="text-[11px] text-slate-400 mb-4">Corretores parceiros e indicações pessoais — quem traz oportunidades para a empresa.</p>
+
+      {geradores.length === 0 ? (
+        <p className="text-slate-400 text-xs">Nenhum lead de corretor ou indicação neste período.</p>
+      ) : (
+        <div className="space-y-3">
+          {geradores.map((g, i) => (
+            <div key={`${g.tipo}:${g.nome}`} className="flex items-center gap-3">
+              <span className="text-[11px] font-bold text-slate-300 w-4 text-right flex-shrink-0">{i + 1}</span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="text-xs font-semibold text-slate-800 truncate">{g.nome}</span>
+                    <Badge color={g.tipo === "Corretor" ? "#3B82F6" : "#F59E0B"}>{g.tipo}</Badge>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {g.aprovados > 0 && (
+                      <span className="text-[10px] font-bold text-emerald-600" title="Contratos aprovados">
+                        {g.aprovados} contrato{g.aprovados > 1 ? "s" : ""}
+                      </span>
+                    )}
+                    <span className="text-xs font-bold text-slate-700 w-5 text-right">{g.leads}</span>
+                  </div>
                 </div>
-                <span className="text-xs font-bold w-5 text-right" style={{ color: s.cor }}>{s.count}</span>
-                <span className="text-[10px] text-slate-400 w-8 text-right">{Math.round(s.frac * 100)}%</span>
+                <div className="bg-slate-100 rounded h-1.5">
+                  <div
+                    className="h-1.5 rounded transition-all duration-500"
+                    style={{ background: g.tipo === "Corretor" ? "#3B82F6" : "#F59E0B", width: `${(g.leads / maxLeads) * 100}%` }}
+                  />
+                </div>
               </div>
             </div>
           ))}
+          <p className="text-[10px] text-slate-400 pt-1">{totalLeads} lead{totalLeads > 1 ? "s" : ""} via corretor/indicação no período.</p>
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -279,8 +275,8 @@ export default function DashboardComercial({ leads }: Props) {
         </div>
       </div>
 
-      {/* Pizza: Leads por Corretor */}
-      <PizzaCorretores leads={noperiodo} />
+      {/* Geradores de Negócio: Corretores parceiros & Indicações pessoais */}
+      <GeradoresNegocio leads={noperiodo} />
 
       {/* Insights */}
       <div className="card p-5">

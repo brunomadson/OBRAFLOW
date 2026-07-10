@@ -6,6 +6,7 @@ import { cn, compareValues, fmtBRL, fmtDate, nextSort, type SortState } from "@/
 import Button from "@/components/ui/Button";
 import Modal, { ModalHeader } from "@/components/ui/Modal";
 import { SkeletonTable } from "@/components/ui/Skeleton";
+import CurrencyInput from "@/components/ui/CurrencyInput";
 import {
   CATEGORIAS_SAIDA, CATEGORIAS_ENTRADA, GRUPOS_COR,
   FORMAS_PAGAMENTO, GRUPO_DE_CATEGORIA, GRUPOS_SAIDA_DRE, GRUPOS_SAIDA_ORDEM,
@@ -122,7 +123,7 @@ function ModalLancamento({ initial, obras, onClose, onSave }: ModalLancamentoPro
   const [tipo, setTipo]           = useState<"entrada" | "saida">(initial?.tipo ?? "saida");
   const [categoria, setCategoria] = useState(initial?.categoria ?? "");
   const [descricao, setDescricao] = useState(initial?.descricao ?? "");
-  const [valor, setValor]         = useState(String(initial?.valor ?? ""));
+  const [valor, setValor]         = useState(initial?.valor ?? 0);
   const [data, setData]           = useState(initial?.data ?? hoje());
   const [dataVenc, setDataVenc]   = useState(initial?.data_vencimento ?? "");
   const [forma, setForma]         = useState(initial?.forma_pagamento ?? "Pix");
@@ -138,8 +139,7 @@ function ModalLancamento({ initial, obras, onClose, onSave }: ModalLancamentoPro
   const cats = tipo === "entrada" ? CATEGORIAS_ENTRADA : CATEGORIAS_SAIDA;
   const grupo = GRUPO_DE_CATEGORIA[categoria] ?? "";
   const grupoCor = GRUPOS_COR[grupo] ?? "#94A3B8";
-  const valorNum = parseFloat(valor.replace(",", ".")) || 0;
-  const valorParc = parcelado && nParc > 0 ? valorNum / nParc : valorNum;
+  const valorParc = parcelado && nParc > 0 ? valor / nParc : valor;
 
   // Recalcula datas apenas quando muda nParc ou data base (respeitando edições manuais)
   const recalcDatas = useCallback((n: number, base: string) => {
@@ -172,7 +172,7 @@ function ModalLancamento({ initial, obras, onClose, onSave }: ModalLancamentoPro
 
   const handleSave = async () => {
     if (!descricao.trim()) { toast.error("Informe a descrição"); return; }
-    if (valorNum <= 0)     { toast.error("Informe o valor"); return; }
+    if (valor <= 0)        { toast.error("Informe o valor"); return; }
     if (!data)             { toast.error("Informe a data"); return; }
     if (!categoria)        { toast.error("Selecione a categoria"); return; }
 
@@ -182,7 +182,7 @@ function ModalLancamento({ initial, obras, onClose, onSave }: ModalLancamentoPro
         const lista = parcDatas.map((d, i) => ({
           tipo, categoria, grupo: GRUPO_DE_CATEGORIA[categoria] ?? null,
           descricao: `${descricao} (${i + 1}/${nParc})`,
-          valor: Math.round((valorNum / nParc) * 100) / 100,
+          valor: Math.round((valor / nParc) * 100) / 100,
           data: d, data_vencimento: d || null, data_confirmacao: null,
           forma_pagamento: forma, status_pagamento: "pendente" as StatusPagamento,
           parcela_num: i + 1, parcela_total: nParc,
@@ -192,7 +192,7 @@ function ModalLancamento({ initial, obras, onClose, onSave }: ModalLancamentoPro
       } else {
         await onSave([{
           tipo, categoria, grupo: GRUPO_DE_CATEGORIA[categoria] ?? null,
-          descricao, valor: valorNum, data,
+          descricao, valor, data,
           data_vencimento: dataVenc || null, data_confirmacao: null,
           forma_pagamento: forma, status_pagamento: tipo === "entrada" ? "pago" : status,
           parcela_num: null, parcela_total: null,
@@ -261,11 +261,10 @@ function ModalLancamento({ initial, obras, onClose, onSave }: ModalLancamentoPro
           </div>
           <div>
             <label className="field-label">Valor (R$) *</label>
-            <input
-              type="number" min={0} step="0.01"
+            <CurrencyInput
               value={valor}
-              onChange={(e) => setValor(e.target.value)}
-              className={`input-base font-bold ${tipo === "entrada" ? "text-emerald-600" : "text-red-500"}`}
+              onChange={setValor}
+              className={`font-bold ${tipo === "entrada" ? "text-emerald-600" : "text-red-500"}`}
               placeholder="0,00"
             />
           </div>
@@ -377,7 +376,7 @@ function ModalLancamento({ initial, obras, onClose, onSave }: ModalLancamentoPro
             {showPreview ? "▲ Ocultar preview" : "▼ Ver preview"}
           </button>
         )}
-        {showPreview && !parcelado && valorNum > 0 && (
+        {showPreview && !parcelado && valor > 0 && (
           <div className="bg-slate-50 border border-slate-100 rounded-xl p-3.5 space-y-1.5 text-[12px]">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Preview do lançamento</p>
             <div className="flex justify-between">
@@ -391,7 +390,7 @@ function ModalLancamento({ initial, obras, onClose, onSave }: ModalLancamentoPro
             <div className="flex justify-between">
               <span className="text-slate-500">Valor</span>
               <span className={`font-bold text-[14px] ${tipo === "entrada" ? "text-emerald-600" : "text-red-500"}`}>
-                {tipo === "entrada" ? "+" : "−"}{fmtBRL(valorNum)}
+                {tipo === "entrada" ? "+" : "−"}{fmtBRL(valor)}
               </span>
             </div>
             {dataVenc && <div className="flex justify-between"><span className="text-slate-500">Vencimento</span><span>{fmtDate(dataVenc)}</span></div>}

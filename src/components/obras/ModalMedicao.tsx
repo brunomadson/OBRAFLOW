@@ -2,6 +2,7 @@
 import { useState } from "react";
 import Modal, { ModalHeader } from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
+import CurrencyInput from "@/components/ui/CurrencyInput";
 import { STATUS_MEDICAO_LABEL, STATUS_MEDICAO_COR } from "@/constants/dominios";
 import type { Medicao, StatusMedicao, MedicaoHistoricoEntry } from "@/types/app.types";
 import toast from "react-hot-toast";
@@ -181,13 +182,9 @@ export default function ModalMedicao({ obraId, obraCliente, medicao, onClose, on
               </div>
               <div>
                 <label className="field-label">Valor Pago (R$)</label>
-                <input
-                  type="number"
-                  min={0}
-                  step={0.01}
-                  value={form.valor_liberado ?? ""}
-                  onChange={(e) => set("valor_liberado", e.target.value ? Number(e.target.value) : undefined)}
-                  className="input-base"
+                <CurrencyInput
+                  value={form.valor_liberado}
+                  onChange={(v) => set("valor_liberado", v || undefined)}
                   placeholder="0,00"
                 />
               </div>

@@ -3,6 +3,7 @@ import { useState, useCallback } from "react";
 import Modal, { ModalHeader } from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
+import CurrencyInput from "@/components/ui/CurrencyInput";
 import Timeline from "@/components/shared/Timeline";
 import StatusBadgeMedicao from "@/components/shared/StatusBadgeMedicao";
 import AbaDocumentos from "@/components/shared/AbaDocumentos";
@@ -637,23 +638,23 @@ export default function ModalObra({ obra, onClose, onSave, onAvancar, onSalvarMe
                 <div className="grid grid-cols-2 gap-3.5">
                   <div>
                     <label className="field-label">Valor Caixa</label>
-                    <input type="number" min={0} value={form.valor_caixa ?? ""} onChange={(e) => set("valor_caixa", Number(e.target.value))} className="input-base" />
+                    <CurrencyInput value={form.valor_caixa} onChange={(v) => set("valor_caixa", v)} />
                   </div>
                   <div>
                     <label className="field-label">Valor de Venda</label>
-                    <input type="number" min={0} value={form.valor_venda ?? ""} onChange={(e) => set("valor_venda", Number(e.target.value))} className="input-base" />
+                    <CurrencyInput value={form.valor_venda} onChange={(v) => set("valor_venda", v)} />
                   </div>
                   <div>
                     <label className="field-label">Valor Terreno (Lote)</label>
-                    <input type="number" min={0} value={form.valor_lote ?? ""} onChange={(e) => set("valor_lote", Number(e.target.value))} className="input-base" />
+                    <CurrencyInput value={form.valor_lote} onChange={(v) => set("valor_lote", v)} />
                   </div>
                   <div>
                     <label className="field-label">Subsídio</label>
-                    <input type="number" min={0} value={form.valor_subsidio ?? ""} onChange={(e) => set("valor_subsidio", Number(e.target.value))} className="input-base" />
+                    <CurrencyInput value={form.valor_subsidio} onChange={(v) => set("valor_subsidio", v)} />
                   </div>
                   <div>
                     <label className="field-label">Renda Bruta</label>
-                    <input type="number" min={0} value={form.renda_bruta ?? ""} onChange={(e) => set("renda_bruta", Number(e.target.value))} className="input-base" />
+                    <CurrencyInput value={form.renda_bruta} onChange={(v) => set("renda_bruta", v)} />
                   </div>
                 </div>
               </div>

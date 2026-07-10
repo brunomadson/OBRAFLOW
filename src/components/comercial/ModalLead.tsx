@@ -3,6 +3,7 @@ import { useState, useCallback, useEffect } from "react";
 import Modal, { ModalHeader } from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
+import CurrencyInput from "@/components/ui/CurrencyInput";
 import Timeline from "@/components/shared/Timeline";
 import { ETAPAS_LEAD, FLUXO_LEAD } from "@/constants/etapas";
 import {
@@ -600,7 +601,6 @@ function FormLead({
   onGerenciarCidades: () => void;
 }) {
   const set = (k: keyof Lead, v: unknown) => onChange({ ...lead, [k]: v });
-  const num = (k: keyof Lead, v: string) => set(k, Number(v.replace(/\D/g, "")) || 0);
 
   return (
     <div className="space-y-5">
@@ -786,33 +786,27 @@ function FormLead({
           </div>
           <div>
             <label className="field-label">Renda Bruta (R$)</label>
-            <input value={lead.renda_bruta || ""} onChange={(e) => num("renda_bruta", e.target.value)}
-              className="input-base" placeholder="Ex: 3500" type="text" inputMode="numeric" />
+            <CurrencyInput value={lead.renda_bruta} onChange={(v) => set("renda_bruta", v)} placeholder="Ex: 3500" />
           </div>
           <div>
             <label className="field-label">Valor do Terreno (R$)</label>
-            <input value={lead.valor_lote || ""} onChange={(e) => num("valor_lote", e.target.value)}
-              className="input-base" placeholder="Ex: 40000" type="text" inputMode="numeric" />
+            <CurrencyInput value={lead.valor_lote} onChange={(v) => set("valor_lote", v)} placeholder="Ex: 40000" />
           </div>
           <div>
             <label className="field-label">Valor Caixa (R$)</label>
-            <input value={lead.valor_caixa || ""} onChange={(e) => num("valor_caixa", e.target.value)}
-              className="input-base" placeholder="Ex: 120000" type="text" inputMode="numeric" />
+            <CurrencyInput value={lead.valor_caixa} onChange={(v) => set("valor_caixa", v)} placeholder="Ex: 120000" />
           </div>
           <div>
             <label className="field-label">Valor Financiado (R$)</label>
-            <input value={lead.valor_financiamento || ""} onChange={(e) => num("valor_financiamento", e.target.value)}
-              className="input-base" placeholder="Ex: 110000" type="text" inputMode="numeric" />
+            <CurrencyInput value={lead.valor_financiamento} onChange={(v) => set("valor_financiamento", v)} placeholder="Ex: 110000" />
           </div>
           <div>
             <label className="field-label">Subsídio (R$)</label>
-            <input value={lead.valor_subsidio || ""} onChange={(e) => num("valor_subsidio", e.target.value)}
-              className="input-base" placeholder="Ex: 30000" type="text" inputMode="numeric" />
+            <CurrencyInput value={lead.valor_subsidio} onChange={(v) => set("valor_subsidio", v)} placeholder="Ex: 30000" />
           </div>
           <div>
             <label className="field-label">Valor Total de Venda (R$)</label>
-            <input value={lead.valor_venda || ""} onChange={(e) => num("valor_venda", e.target.value)}
-              className="input-base" placeholder="Ex: 150000" type="text" inputMode="numeric" />
+            <CurrencyInput value={lead.valor_venda} onChange={(v) => set("valor_venda", v)} placeholder="Ex: 150000" />
           </div>
         </div>
       </div>

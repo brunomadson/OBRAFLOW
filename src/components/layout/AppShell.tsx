@@ -6,7 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLeads } from "@/hooks/useLeads";
 import { useObras } from "@/hooks/useObras";
 import { useNotificacoes } from "@/hooks/useNotificacoes";
-import { CONFIG_PADRAO } from "@/constants/config";
+import { useConfig } from "@/hooks/useConfig";
 import { getSetorInicial } from "@/lib/utils";
 
 export default function AppShell({ children }: { children: ReactNode }) {
@@ -15,7 +15,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { leads } = useLeads();
   const { obras } = useObras();
-  const notifs = useNotificacoes(leads, obras, CONFIG_PADRAO, []);
+  const config = useConfig();
+  const notifs = useNotificacoes(leads, obras, config, []);
 
   const notifCount = notifs.filter((n) => n.tipo === "critico").length;
 

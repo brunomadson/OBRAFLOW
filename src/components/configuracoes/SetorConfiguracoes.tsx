@@ -3,35 +3,35 @@ import { useState, useEffect, useCallback } from "react";
 import ModalMembro from "./ModalMembro";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
-import { GRUPOS_CONFIG } from "@/constants/config";
+import { GRUPOS_CONFIG, CONFIG_PADRAO } from "@/constants/config";
+import { getConfig, saveConfig } from "@/services/config.service";
 import { getProfiles, upsertProfile } from "@/services/profiles.service";
 import { createClient } from "@/lib/supabase/client";
-import type { Profile } from "@/types/app.types";
+import type { Profile, ConfigPrazos } from "@/types/app.types";
 import toast from "react-hot-toast";
 
 type Aba = "prazos" | "membros" | "integracoes";
 
 /* ---- Aba Prazos ---- */
 function AbaPrazos() {
-  const supabase = createClient();
-  const [config, setConfig] = useState<Record<string, number>>({});
+  const [config, setConfig] = useState<ConfigPrazos>(CONFIG_PADRAO);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    supabase.from("config").select("*").limit(1).single().then(({ data }) => {
-      if (data) setConfig(data as Record<string, number>);
-    });
-  }, [supabase]);
+    getConfig().then(setConfig).finally(() => setLoading(false));
+  }, []);
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      const { error } = await supabase.from("config").upsert(config as never);
-      if (error) throw error;
+      await saveConfig(config);
       toast.success("Configurações salvas!");
     } catch { toast.error("Erro ao salvar."); }
     finally { setSaving(false); }
   };
+
+  if (loading) return <p className="text-sm text-slate-400">Carregando...</p>;
 
   return (
     <div className="max-w-2xl">
@@ -49,7 +49,7 @@ function AbaPrazos() {
                   <input
                     type="number"
                     min={1}
-                    value={config[campo.key] ?? 0}
+                    value={(config as unknown as Record<string, number>)[campo.key] ?? 0}
                     onChange={(e) => setConfig((p) => ({ ...p, [campo.key]: Number(e.target.value) }))}
                     className="input-base w-20 text-center"
                   />

@@ -3,7 +3,7 @@ import { useState, useMemo } from "react";
 import { useLeads } from "@/hooks/useLeads";
 import { useObras } from "@/hooks/useObras";
 import { useNotificacoes } from "@/hooks/useNotificacoes";
-import { CONFIG_PADRAO } from "@/constants/config";
+import { useConfig } from "@/hooks/useConfig";
 import Badge from "@/components/ui/Badge";
 import type { Notificacao } from "@/types/app.types";
 
@@ -35,7 +35,8 @@ const SETORES = [
 export default function CentralNotificacoes() {
   const { leads } = useLeads();
   const { obras } = useObras();
-  const notifs = useNotificacoes(leads, obras, CONFIG_PADRAO, []);
+  const config = useConfig();
+  const notifs = useNotificacoes(leads, obras, config, []);
 
   const [filtroTipo,  setFiltroTipo]  = useState<Notificacao["tipo"] | "todas">("todas");
   const [filtroSetor, setFiltroSetor] = useState<string>("todos");

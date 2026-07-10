@@ -1,21 +1,18 @@
 "use client";
-import { memo } from "react";
+import { memo, useState } from "react";
+import {
+  DndContext, DragOverlay, PointerSensor, useDraggable, useDroppable,
+  useSensor, useSensors, type DragEndEvent, type DragStartEvent,
+} from "@dnd-kit/core";
 import { ETAPAS_LEAD } from "@/constants/etapas";
 import Badge from "@/components/ui/Badge";
-import { fmtBRL } from "@/lib/utils";
-import type { Lead } from "@/types/app.types";
+import { cn, fmtBRL } from "@/lib/utils";
+import type { Lead, EtapaLead } from "@/types/app.types";
 
-interface CardProps {
-  lead: Lead;
-  etapaCor: string;
-  onClick: (lead: Lead) => void;
-}
-
-const CardKanban = memo(function CardKanban({ lead, etapaCor, onClick }: CardProps) {
+function CardConteudo({ lead, etapaCor }: { lead: Lead; etapaCor: string }) {
   return (
     <div
-      onClick={() => onClick(lead)}
-      className="bg-white rounded-xl p-4 mb-2.5 shadow-card border border-slate-100 cursor-pointer border-l-[3px] hover:shadow-card-hover transition-shadow"
+      className="bg-white rounded-xl p-4 shadow-card border border-slate-100 border-l-[3px]"
       style={{ borderLeftColor: etapaCor }}
     >
       <div className="flex justify-between items-start mb-1.5">
@@ -44,50 +41,142 @@ const CardKanban = memo(function CardKanban({ lead, etapaCor, onClick }: CardPro
       </div>
     </div>
   );
+}
+
+interface CardProps {
+  lead: Lead;
+  etapaCor: string;
+  onClick: (lead: Lead) => void;
+}
+
+const CardKanban = memo(function CardKanban({ lead, etapaCor, onClick }: CardProps) {
+  // Distância mínima antes de considerar "arrastando" — evita que um clique
+  // simples no card (pra abrir o modal) seja interpretado como início de drag.
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: lead.id,
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      onClick={() => !isDragging && onClick(lead)}
+      className={cn("mb-2.5 cursor-grab active:cursor-grabbing touch-none", isDragging && "opacity-30")}
+      style={transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 10 } : undefined}
+    >
+      <div className="hover:shadow-card-hover transition-shadow rounded-xl">
+        <CardConteudo lead={lead} etapaCor={etapaCor} />
+      </div>
+    </div>
+  );
 });
+
+function ColunaEtapa({ etapa, cards, total, onAddLead, onEdit }: {
+  etapa: (typeof ETAPAS_LEAD)[number];
+  cards: Lead[];
+  total: number;
+  onAddLead: () => void;
+  onEdit: (lead: Lead) => void;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: etapa.id });
+
+  return (
+    <div ref={setNodeRef} className="min-w-[235px] max-w-[250px] flex-shrink-0">
+      <div
+        className="flex justify-between items-center mb-2.5 px-2.5 py-2 bg-slate-50 rounded-xl border-t-[3px]"
+        style={{ borderTopColor: etapa.cor }}
+      >
+        <div>
+          <p className="text-xs font-bold text-slate-900">{etapa.label}</p>
+          {total > 0 && <p className="text-[10px] text-slate-500 mt-0.5">{fmtBRL(total)}</p>}
+        </div>
+        <Badge color={etapa.cor}>{cards.length}</Badge>
+      </div>
+
+      <div
+        className={cn(
+          "min-h-[80px] rounded-xl transition-colors",
+          isOver && "bg-blue-50 outline-2 outline-dashed outline-blue-300"
+        )}
+      >
+        {cards.map((lead) => (
+          <CardKanban key={lead.id} lead={lead} etapaCor={etapa.cor} onClick={onEdit} />
+        ))}
+      </div>
+
+      {etapa.id === "leads" && (
+        <button
+          onClick={onAddLead}
+          className="w-full border-[1.5px] border-dashed border-slate-300 bg-transparent rounded-xl py-2.5 text-xs text-slate-400 cursor-pointer mt-1 font-semibold hover:border-slate-400 transition-colors"
+        >
+          + Novo Lead
+        </button>
+      )}
+    </div>
+  );
+}
 
 interface Props {
   leads: Lead[];
   onEdit: (lead: Lead) => void;
   onAddLead: () => void;
+  onMoveEtapa: (leadId: string, novaEtapa: EtapaLead) => void | Promise<void>;
 }
 
-export default function Pipeline({ leads, onEdit, onAddLead }: Props) {
+export default function Pipeline({ leads, onEdit, onAddLead, onMoveEtapa }: Props) {
+  const [activeLead, setActiveLead] = useState<Lead | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  );
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const lead = leads.find((l) => l.id === event.active.id);
+    setActiveLead(lead ?? null);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveLead(null);
+    const { active, over } = event;
+    if (!over) return;
+
+    const lead = leads.find((l) => l.id === active.id);
+    const novaEtapa = over.id as EtapaLead;
+    if (!lead || lead.etapa === novaEtapa) return;
+
+    onMoveEtapa(lead.id, novaEtapa);
+  };
+
   return (
-    <div className="flex gap-3 overflow-x-auto pb-3 items-start">
-      {ETAPAS_LEAD.map((etapa) => {
-        const cards = leads.filter((l) => l.etapa === etapa.id);
-        const total = cards.reduce((s, l) => s + (Number(l.valor_venda) || 0), 0);
-        return (
-          <div key={etapa.id} className="min-w-[235px] max-w-[250px] flex-shrink-0">
-            <div
-              className="flex justify-between items-center mb-2.5 px-2.5 py-2 bg-slate-50 rounded-xl border-t-[3px]"
-              style={{ borderTopColor: etapa.cor }}
-            >
-              <div>
-                <p className="text-xs font-bold text-slate-900">{etapa.label}</p>
-                {total > 0 && <p className="text-[10px] text-slate-500 mt-0.5">{fmtBRL(total)}</p>}
-              </div>
-              <Badge color={etapa.cor}>{cards.length}</Badge>
-            </div>
+    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <div className="flex gap-3 overflow-x-auto pb-3 items-start">
+        {ETAPAS_LEAD.map((etapa) => {
+          const cards = leads.filter((l) => l.etapa === etapa.id);
+          const total = cards.reduce((s, l) => s + (Number(l.valor_venda) || 0), 0);
+          return (
+            <ColunaEtapa
+              key={etapa.id}
+              etapa={etapa}
+              cards={cards}
+              total={total}
+              onAddLead={onAddLead}
+              onEdit={onEdit}
+            />
+          );
+        })}
+      </div>
 
-            <div className="min-h-[60px]">
-              {cards.map((lead) => (
-                <CardKanban key={lead.id} lead={lead} etapaCor={etapa.cor} onClick={onEdit} />
-              ))}
-            </div>
-
-            {etapa.id === "leads" && (
-              <button
-                onClick={onAddLead}
-                className="w-full border-[1.5px] border-dashed border-slate-300 bg-transparent rounded-xl py-2.5 text-xs text-slate-400 cursor-pointer mt-1 font-semibold hover:border-slate-400 transition-colors"
-              >
-                + Novo Lead
-              </button>
-            )}
+      <DragOverlay>
+        {activeLead ? (
+          <div className="w-[220px] rotate-2 shadow-card-hover">
+            <CardConteudo
+              lead={activeLead}
+              etapaCor={ETAPAS_LEAD.find((e) => e.id === activeLead.etapa)?.cor ?? "#94A3B8"}
+            />
           </div>
-        );
-      })}
-    </div>
+        ) : null}
+      </DragOverlay>
+    </DndContext>
   );
 }

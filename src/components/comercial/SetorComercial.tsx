@@ -78,6 +78,7 @@ export default function SetorComercial() {
                 leads={leadsFiltrados}
                 onEdit={setModalLead}
                 onAddLead={() => setModalLead("novo")}
+                onMoveEtapa={async (id, etapa) => { await avancarEtapa(id, etapa); }}
               />
             )}
             {aba === "propostas" && (

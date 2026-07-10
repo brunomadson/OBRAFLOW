@@ -85,7 +85,7 @@ export function useLeads() {
           tipo: "comercial", acao: acaoText,
           usuario_nome: nomeUsuario, usuario_id: null, setor: "comercial", etapa: novaEtapa,
         }).catch(() => {});
-        toast.success(`Lead avançado para ${novaEtapa}`);
+        toast.success(`Lead movido para "${labelEtapaLead(novaEtapa)}"`);
         return atualizado;
       } catch {
         toast.error("Erro ao avançar etapa");

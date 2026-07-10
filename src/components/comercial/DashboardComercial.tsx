@@ -70,48 +70,101 @@ function GeradoresNegocio({ leads }: { leads: Lead[] }) {
     return Object.values(map).sort((a, b) => b.leads - a.leads);
   }, [leads]);
 
-  const maxLeads = Math.max(...geradores.map((g) => g.leads), 1);
   const totalLeads = geradores.reduce((s, g) => s + g.leads, 0);
 
-  return (
-    <div className="card p-5 mb-5">
-      <p className="text-[13px] font-bold text-slate-900 mb-1">Geradores de Negócio</p>
-      <p className="text-[11px] text-slate-400 mb-4">Corretores parceiros e indicações pessoais — quem traz oportunidades para a empresa.</p>
+  // Recorte só de quem já converteu em contrato — subconjunto do geral.
+  const CORES_APROVADOS = ["#3B82F6", "#F59E0B", "#10B981", "#8B5CF6", "#EF4444", "#06B6D4"];
+  const aprovadosGeradores = geradores
+    .filter((g) => g.aprovados > 0)
+    .sort((a, b) => b.aprovados - a.aprovados);
+  const totalAprovados = aprovadosGeradores.reduce((s, g) => s + g.aprovados, 0);
 
-      {geradores.length === 0 ? (
-        <p className="text-slate-400 text-xs">Nenhum lead de corretor ou indicação neste período.</p>
-      ) : (
-        <div className="space-y-3">
-          {geradores.map((g, i) => (
-            <div key={`${g.tipo}:${g.nome}`} className="flex items-center gap-3">
-              <span className="text-[11px] font-bold text-slate-300 w-4 text-right flex-shrink-0">{i + 1}</span>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2 mb-1">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <span className="text-xs font-semibold text-slate-800 truncate">{g.nome}</span>
-                    <Badge color={g.tipo === "Corretor" ? "#3B82F6" : "#F59E0B"}>{g.tipo}</Badge>
+  const R = 46, cx = 60, cy = 60;
+  let startAngle = -Math.PI / 2;
+  const fatias = aprovadosGeradores.map((g, i) => {
+    const frac = g.aprovados / totalAprovados;
+    // Clamp abaixo de 360°: uma fatia sozinha em 100% faz o arco terminar
+    // onde começou e o SVG não desenha nada (mesmo bug do gráfico de vencimentos).
+    const angle = Math.min(frac * 2 * Math.PI, 2 * Math.PI - 0.001);
+    const x1 = cx + R * Math.cos(startAngle);
+    const y1 = cy + R * Math.sin(startAngle);
+    startAngle += angle;
+    const x2 = cx + R * Math.cos(startAngle);
+    const y2 = cy + R * Math.sin(startAngle);
+    const large = angle > Math.PI ? 1 : 0;
+    const path = `M ${cx} ${cy} L ${x1} ${y1} A ${R} ${R} 0 ${large} 1 ${x2} ${y2} Z`;
+    return { ...g, frac, path, cor: CORES_APROVADOS[i % CORES_APROVADOS.length] };
+  });
+
+  return (
+    <div className="grid grid-cols-2 gap-3.5 mb-5">
+      {/* Geral: toda oportunidade trazida, independente da etapa atual */}
+      <div className="card p-5">
+        <p className="text-[13px] font-bold text-slate-900 mb-1">Geradores de Negócio — Geral</p>
+        <p className="text-[11px] text-slate-400 mb-4">Toda oportunidade trazida por corretores e indicações, em qualquer etapa do funil.</p>
+
+        {geradores.length === 0 ? (
+          <p className="text-slate-400 text-xs">Nenhum lead de corretor ou indicação neste período.</p>
+        ) : (
+          <div className="space-y-3">
+            {geradores.map((g, i) => (
+              <div key={`${g.tipo}:${g.nome}`} className="flex items-center gap-3">
+                <span className="text-[11px] font-bold text-slate-300 w-4 text-right flex-shrink-0">{i + 1}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-xs font-semibold text-slate-800 truncate">{g.nome}</span>
+                      <Badge color={g.tipo === "Corretor" ? "#3B82F6" : "#F59E0B"}>{g.tipo}</Badge>
+                    </div>
+                    <span className="text-xs font-bold text-slate-700 flex-shrink-0">{g.leads}</span>
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {g.aprovados > 0 && (
-                      <span className="text-[10px] font-bold text-emerald-600" title="Contratos aprovados">
-                        {g.aprovados} contrato{g.aprovados > 1 ? "s" : ""}
-                      </span>
-                    )}
-                    <span className="text-xs font-bold text-slate-700 w-5 text-right">{g.leads}</span>
+                  <div className="bg-slate-100 rounded h-1.5">
+                    <div
+                      className="h-1.5 rounded transition-all duration-500"
+                      style={{ background: g.tipo === "Corretor" ? "#3B82F6" : "#F59E0B", width: `${totalLeads > 0 ? (g.leads / totalLeads) * 100 : 0}%` }}
+                    />
                   </div>
-                </div>
-                <div className="bg-slate-100 rounded h-1.5">
-                  <div
-                    className="h-1.5 rounded transition-all duration-500"
-                    style={{ background: g.tipo === "Corretor" ? "#3B82F6" : "#F59E0B", width: `${(g.leads / maxLeads) * 100}%` }}
-                  />
                 </div>
               </div>
+            ))}
+            <p className="text-[10px] text-slate-400 pt-1">{totalLeads} lead{totalLeads !== 1 ? "s" : ""} via corretor/indicação no período.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Contratos fechados: só quem já converteu */}
+      <div className="card p-5">
+        <p className="text-[13px] font-bold text-slate-900 mb-1">Contratos Fechados</p>
+        <p className="text-[11px] text-slate-400 mb-4">Apenas propostas aprovadas — quem realmente converteu em contrato.</p>
+
+        {aprovadosGeradores.length === 0 ? (
+          <p className="text-slate-400 text-xs">Nenhum contrato aprovado ainda neste período.</p>
+        ) : (
+          <div className="flex items-center gap-6">
+            <svg width="120" height="120" viewBox="0 0 120 120" className="flex-shrink-0">
+              {fatias.map((s, i) => (
+                <path key={i} d={s.path} fill={s.cor} stroke="#fff" strokeWidth="2">
+                  <title>{s.nome}: {s.aprovados}</title>
+                </path>
+              ))}
+              <circle cx={cx} cy={cy} r={R * 0.55} fill="#fff" />
+              <text x={cx} y={cy - 3} textAnchor="middle" fontSize="15" fontWeight="800" fill="#0F172A">{totalAprovados}</text>
+              <text x={cx} y={cy + 12} textAnchor="middle" fontSize="8" fill="#94A3B8">contrato{totalAprovados !== 1 ? "s" : ""}</text>
+            </svg>
+            <div className="flex-1 space-y-1.5 min-w-0">
+              {fatias.map((s) => (
+                <div key={`${s.tipo}:${s.nome}`} className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.cor }} />
+                    <span className="text-[11px] text-slate-700 truncate">{s.nome}</span>
+                  </div>
+                  <span className="text-[11px] font-bold flex-shrink-0" style={{ color: s.cor }}>{s.aprovados}</span>
+                </div>
+              ))}
             </div>
-          ))}
-          <p className="text-[10px] text-slate-400 pt-1">{totalLeads} lead{totalLeads > 1 ? "s" : ""} via corretor/indicação no período.</p>
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

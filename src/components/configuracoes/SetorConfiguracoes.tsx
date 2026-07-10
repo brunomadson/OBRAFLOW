@@ -6,10 +6,13 @@ import Badge from "@/components/ui/Badge";
 import { GRUPOS_CONFIG, CONFIG_PADRAO, GRUPOS_METAS } from "@/constants/config";
 import { getConfig, saveConfig } from "@/services/config.service";
 import { getMetas, upsertMeta, periodoAtual } from "@/services/metas.service";
+import { getIntegracoes, conectarIntegracao } from "@/services/integracoes.service";
+import { ICONE_INTEGRACAO } from "@/constants/integracoes";
 import CurrencyInput from "@/components/ui/CurrencyInput";
+import Modal, { ModalHeader } from "@/components/ui/Modal";
 import { getProfiles, upsertProfile } from "@/services/profiles.service";
 import { createClient } from "@/lib/supabase/client";
-import type { Profile, ConfigPrazos, IndicadorMeta } from "@/types/app.types";
+import type { Profile, ConfigPrazos, IndicadorMeta, IntegracaoComStatus } from "@/types/app.types";
 import toast from "react-hot-toast";
 
 type Aba = "prazos" | "metas" | "membros" | "integracoes";
@@ -221,35 +224,79 @@ function AbaMembros() {
 
 /* ---- Aba Integrações ---- */
 function AbaIntegracoes() {
+  const [integracoes, setIntegracoes] = useState<IntegracaoComStatus[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [conectando, setConectando] = useState<string | null>(null);
+  const [modal, setModal] = useState<"configurar" | "upgrade" | null>(null);
+
+  const load = useCallback(() => {
+    getIntegracoes().then(setIntegracoes).catch(() => toast.error("Erro ao carregar integrações.")).finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleConectar = async (integracao: IntegracaoComStatus) => {
+    setConectando(integracao.id);
+    try {
+      await conectarIntegracao(integracao.id);
+      toast.success(`${integracao.nome} conectado!`);
+      await load();
+    } catch { toast.error("Erro ao conectar."); }
+    finally { setConectando(null); }
+  };
+
+  if (loading) return <p className="text-sm text-slate-400">Carregando...</p>;
+
   return (
     <div className="max-w-2xl">
-      <div className="card p-5 mb-3.5">
-        <div className="flex justify-between items-center">
-          <div>
-            <p className="text-[13px] font-bold text-slate-900 mb-0.5">Supabase</p>
-            <p className="text-xs text-slate-400">Banco de dados e autenticação</p>
+      <p className="text-xs text-slate-400 mb-4">
+        Conexões externas opcionais, de acordo com o seu plano. Integrações internas da plataforma não aparecem aqui.
+      </p>
+      <div className="space-y-3">
+        {integracoes.map((i) => (
+          <div key={i.id} className={`card p-5 ${!i.disponivelNoPlano ? "opacity-70" : ""}`}>
+            <div className="flex justify-between items-center gap-4">
+              <div className="flex items-start gap-3 min-w-0">
+                <span className="text-2xl flex-shrink-0">{ICONE_INTEGRACAO[i.codigo]}</span>
+                <div className="min-w-0">
+                  <p className="text-[13px] font-bold text-slate-900 mb-0.5">{i.nome}</p>
+                  <p className="text-xs text-slate-400">{i.descricao}</p>
+                </div>
+              </div>
+              <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                {!i.disponivelNoPlano ? (
+                  <Badge color="#94A3B8">Plano superior</Badge>
+                ) : i.status === "conectado" ? (
+                  <Badge color="#10B981">Conectado</Badge>
+                ) : (
+                  <Badge color="#94A3B8">Não conectado</Badge>
+                )}
+
+                {!i.disponivelNoPlano ? (
+                  <Button variant="secondary" size="sm" onClick={() => setModal("upgrade")}>Upgrade</Button>
+                ) : i.status === "conectado" ? (
+                  <Button variant="secondary" size="sm" onClick={() => setModal("configurar")}>Configurar</Button>
+                ) : (
+                  <Button variant="primary" size="sm" loading={conectando === i.id} onClick={() => handleConectar(i)}>Conectar</Button>
+                )}
+              </div>
+            </div>
           </div>
-          <Badge color="#10B981">Conectado</Badge>
-        </div>
+        ))}
       </div>
-      <div className="card p-5 mb-3.5 opacity-60">
-        <div className="flex justify-between items-center">
-          <div>
-            <p className="text-[13px] font-bold text-slate-900 mb-0.5">WhatsApp (Em breve)</p>
-            <p className="text-xs text-slate-400">Envio automático de mensagens</p>
+
+      {modal && (
+        <Modal onClose={() => setModal(null)} size="sm">
+          <ModalHeader title={modal === "upgrade" ? "Upgrade de plano" : "Configurar integração"} onClose={() => setModal(null)} />
+          <div className="p-5">
+            <p className="text-sm text-slate-600">
+              {modal === "upgrade"
+                ? "Essa integração está disponível em um plano superior. Fale com o time ObraFlow para fazer upgrade do seu plano."
+                : "As opções de configuração dessa integração chegam em breve."}
+            </p>
           </div>
-          <Badge color="#94A3B8">Indisponível</Badge>
-        </div>
-      </div>
-      <div className="card p-5 opacity-60">
-        <div className="flex justify-between items-center">
-          <div>
-            <p className="text-[13px] font-bold text-slate-900 mb-0.5">Google Calendar (Em breve)</p>
-            <p className="text-xs text-slate-400">Sincronização de reuniões</p>
-          </div>
-          <Badge color="#94A3B8">Indisponível</Badge>
-        </div>
-      </div>
+        </Modal>
+      )}
     </div>
   );
 }

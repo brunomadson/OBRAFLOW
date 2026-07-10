@@ -380,3 +380,34 @@ export interface MetaDashboard {
   created_at: string;
   updated_at: string;
 }
+
+// ─── Domínio: Integrações ─────────────────────────────────────────────────────
+export type CodigoIntegracao =
+  | "whatsapp"
+  | "google_drive"
+  | "google_agenda"
+  | "ia"
+  | "open_finance"
+  | "importacao_externa";
+
+export type StatusIntegracao = "nao_conectado" | "conectado";
+
+export interface Plano {
+  id: string;
+  codigo: string;
+  nome: string;
+}
+
+export interface Integracao {
+  id: string;
+  codigo: CodigoIntegracao;
+  nome: string;
+  descricao: string | null;
+  ativo: boolean;
+}
+
+// Visão já resolvida: integração + se o plano do workspace libera + estado de conexão.
+export interface IntegracaoComStatus extends Integracao {
+  disponivelNoPlano: boolean;
+  status: StatusIntegracao;
+}

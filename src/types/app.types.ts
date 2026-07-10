@@ -361,3 +361,22 @@ export interface ConfigPrazos {
   pagamento_dias_uteis: number;
   pagamento_alerta_dias_uteis: number;
 }
+
+// ─── Domínio: Metas de Dashboard ──────────────────────────────────────────────
+export type IndicadorMeta =
+  | "comercial_oportunidades"
+  | "comercial_valor_potencial"
+  | "comercial_taxa_conversao"
+  | "obras_ativas"
+  | "obras_valor_liberado_caixa"
+  | "financeiro_receita_total";
+
+export interface MetaDashboard {
+  id: string;
+  workspace_id?: string | null;
+  indicador: IndicadorMeta;
+  periodo: string; // "YYYY-MM"
+  valor_meta: number;
+  created_at: string;
+  updated_at: string;
+}

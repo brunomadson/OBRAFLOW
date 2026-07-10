@@ -1,4 +1,4 @@
-import type { ConfigPrazos } from "@/types/app.types";
+import type { ConfigPrazos, IndicadorMeta } from "@/types/app.types";
 
 export const CONFIG_PADRAO: ConfigPrazos = {
   analise_credito_horas:           48,
@@ -82,6 +82,49 @@ export const GRUPOS_CONFIG = [
       { key: "laudo_apos_solicitada_dias",   label: "Prazo — Laudo após Solicitada",         desc: "Dias após medição 'Solicitada' para laudo emitido.",         unidade: "dias" },
       { key: "pagamento_apos_laudo_dias",    label: "Prazo — Pagamento após laudo",          desc: "Dias para liberação do pagamento após laudo emitido.",       unidade: "dias" },
       { key: "pagamento_apos_laudo_alerta",  label: "Alerta antecipado — Pagamento",         desc: "Dias antes do prazo de pagamento para alerta.",             unidade: "dias" },
+    ],
+  },
+];
+
+// ─── Metas de Dashboard ───────────────────────────────────────────────────────
+// Metas mensais usadas nos comparativos "Meta x Realizado" das dashboards.
+// Um indicador sem meta cadastrada simplesmente não mostra o comparativo —
+// nada de valor fixo escondido no código das dashboards.
+export const GRUPOS_METAS: {
+  id: string;
+  label: string;
+  emoji: string;
+  cor: string;
+  itens: { indicador: IndicadorMeta; label: string; desc: string; tipo: "numero" | "moeda" | "percentual" }[];
+}[] = [
+  {
+    id: "comercial",
+    label: "Dashboard Comercial",
+    emoji: "💼",
+    cor: "#3B82F6",
+    itens: [
+      { indicador: "comercial_oportunidades",   label: "Oportunidades",       desc: "Quantidade de oportunidades no mês.",     tipo: "numero" },
+      { indicador: "comercial_valor_potencial", label: "Valor Potencial",     desc: "Valor potencial em vendas no mês.",       tipo: "moeda" },
+      { indicador: "comercial_taxa_conversao",  label: "Taxa de Conversão",   desc: "Percentual de leads convertidos em aprovados.", tipo: "percentual" },
+    ],
+  },
+  {
+    id: "obras",
+    label: "Dashboard Obras",
+    emoji: "🏗",
+    cor: "#10B981",
+    itens: [
+      { indicador: "obras_ativas",               label: "Obras Ativas",         desc: "Quantidade de obras ativas desejada.",       tipo: "numero" },
+      { indicador: "obras_valor_liberado_caixa", label: "Valor Liberado (Caixa)", desc: "Valor liberado pela Caixa no mês.",        tipo: "moeda" },
+    ],
+  },
+  {
+    id: "financeiro",
+    label: "Dashboard Financeiro",
+    emoji: "💰",
+    cor: "#F59E0B",
+    itens: [
+      { indicador: "financeiro_receita_total",  label: "Receita Total",       desc: "Meta de receita no mês.",                  tipo: "moeda" },
     ],
   },
 ];

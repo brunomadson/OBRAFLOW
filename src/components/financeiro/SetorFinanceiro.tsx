@@ -1,6 +1,7 @@
 "use client";
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useFinanceiro } from "@/hooks/useFinanceiro";
+import { useMetas } from "@/hooks/useMetas";
 import { getObras } from "@/services/obras.service";
 import { cn, compareValues, fmtBRL, fmtDate, nextSort, type SortState } from "@/lib/utils";
 import Button from "@/components/ui/Button";
@@ -710,6 +711,7 @@ function TabDashboard({ lancamentos, obras, onAbrirPrioridades, onPagar }: {
   onPagar: (id: string) => void;
 }) {
   const [filtroVenc, setFiltroVenc] = useState<FiltroVenc | null>(null);
+  const metas = useMetas();
   const meses = ultimos6Meses();
   const mesAtual  = meses[5].key;
   const mesAnter  = meses[4].key;
@@ -770,18 +772,26 @@ function TabDashboard({ lancamentos, obras, onAbrirPrioridades, onPagar }: {
 
   const insights = [insightCresceu, insightPreocupa, insightAcao];
 
-  function Kpi({ label, valor, cor, variacao, destaque }: {
+  function Kpi({ label, valor, cor, variacao, destaque, meta, metaLabel }: {
     label: string; valor: string; cor: string; variacao?: number | null; destaque?: boolean;
+    meta?: number | null; metaLabel?: string;
   }) {
     return (
       <div className={`card p-4 border-t-[3px]`} style={{ borderTopColor: cor }}>
         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{label}</p>
         <p className={`text-[18px] font-extrabold ${destaque ? "text-emerald-600" : "text-slate-900"}`}>{valor}</p>
-        {variacao !== undefined && variacao !== null && (
-          <p className={`text-[10px] font-semibold mt-0.5 ${variacao >= 0 ? "text-emerald-500" : "text-red-500"}`}>
-            {variacao >= 0 ? "+" : ""}{variacao}% vs mês anterior
-          </p>
-        )}
+        <div className="flex items-center gap-2 flex-wrap mt-0.5">
+          {variacao !== undefined && variacao !== null && (
+            <p className={`text-[10px] font-semibold ${variacao >= 0 ? "text-emerald-500" : "text-red-500"}`}>
+              {variacao >= 0 ? "+" : ""}{variacao}% vs mês anterior
+            </p>
+          )}
+          {meta !== undefined && meta !== null && (
+            <p className={`text-[10px] font-semibold ${meta >= 0 ? "text-emerald-500" : "text-red-500"}`}>
+              {meta >= 0 ? "+" : ""}{meta}% vs meta{metaLabel ? ` (${metaLabel})` : ""}
+            </p>
+          )}
+        </div>
       </div>
     );
   }
@@ -790,7 +800,14 @@ function TabDashboard({ lancamentos, obras, onAbrirPrioridades, onPagar }: {
     <div className="space-y-5">
       {/* KPIs */}
       <div className="grid grid-cols-4 gap-3.5">
-        <Kpi label="Receita Total"     valor={fmtBRL(totalRec)}   cor="#10B981" variacao={varPct(recAtual, recAnter)} />
+        <Kpi
+          label="Receita Total"
+          valor={fmtBRL(totalRec)}
+          cor="#10B981"
+          variacao={varPct(recAtual, recAnter)}
+          meta={metas.financeiro_receita_total !== undefined ? varPct(recAtual, metas.financeiro_receita_total) : undefined}
+          metaLabel={metas.financeiro_receita_total !== undefined ? `meta ${fmtBRL(metas.financeiro_receita_total)}` : undefined}
+        />
         <Kpi label="Total Saídas"      valor={fmtBRL(totalSai)}   cor="#EF4444" variacao={varPct(saiAtual, saiAnter)} />
         <Kpi label="Saldo do Período"  valor={fmtBRL(lucroLiq)}   cor={lucroLiq >= 0 ? "#3B82F6" : "#EF4444"} variacao={varPct(saldoAtual, saldoAnter)} />
         <Kpi label="Medições Pendentes" valor={String(medicoesPend)} cor="#F59E0B" />

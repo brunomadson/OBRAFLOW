@@ -3,14 +3,10 @@ import { useMemo } from "react";
 import { ETAPAS_OBRA } from "@/constants/etapas";
 import { STATUS_MEDICAO_COR, STATUS_MEDICAO_LABEL } from "@/constants/dominios";
 import { fmtBRL, fmtDate } from "@/lib/utils";
+import { useMetas } from "@/hooks/useMetas";
 import type { Obra, StatusMedicao } from "@/types/app.types";
 
 interface Props { obras: Obra[] }
-
-// ── Metas configuráveis ──────────────────────────────────────────────────────
-const META_OBRAS_ATIVAS  = 15;
-const META_VALOR_MENSAL  = 500_000;
-const META_MED_PAGAS_MES = 5;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function isThisMonth(d: string | null | undefined) {
@@ -176,6 +172,10 @@ function InsightCard({ titulo, texto, tipo }: { titulo: string; texto: string; t
 
 // ── Dashboard principal ───────────────────────────────────────────────────────
 export default function DashboardObras({ obras }: Props) {
+  const metas = useMetas();
+  const metaObrasAtivas = metas.obras_ativas;
+  const metaValorMensal = metas.obras_valor_liberado_caixa;
+
   const stats = useMemo(() => {
     const now = new Date();
 
@@ -275,7 +275,7 @@ export default function DashboardObras({ obras }: Props) {
     } else {
       list.push({
         tipo: "verde", titulo: "Pipeline ativo",
-        texto: `${stats.ativas.length} obras em andamento e ${stats.concl.length} entregues até hoje. Mantenha o ritmo para bater a meta de ${META_OBRAS_ATIVAS} ativas.`,
+        texto: `${stats.ativas.length} obras em andamento e ${stats.concl.length} entregues até hoje.${metaObrasAtivas !== undefined ? ` Mantenha o ritmo para bater a meta de ${metaObrasAtivas} ativas.` : ""}`,
       });
     }
 
@@ -310,11 +310,13 @@ export default function DashboardObras({ obras }: Props) {
         ? `Etapa "${etapaGargalo.label}" concentra ${etapaGargalo.count} obras. Priorize o avanço dessa fase para desbloquear o pipeline e gerar novas medições.`
         : stats.medPend > 0
           ? `Há ${stats.medPend} medição${stats.medPend !== 1 ? "ões pendentes" : " pendente"}. Solicite atualização de status com a Caixa para converter em receita este mês.`
-          : `Meta do mês: abrir ${Math.max(0, META_OBRAS_ATIVAS - stats.ativas.length)} nova${Math.max(0, META_OBRAS_ATIVAS - stats.ativas.length) !== 1 ? "s obras" : " obra"} para atingir ${META_OBRAS_ATIVAS} ativas.`,
+          : metaObrasAtivas !== undefined
+            ? `Meta do mês: abrir ${Math.max(0, metaObrasAtivas - stats.ativas.length)} nova${Math.max(0, metaObrasAtivas - stats.ativas.length) !== 1 ? "s obras" : " obra"} para atingir ${metaObrasAtivas} ativas.`
+            : `${stats.ativas.length} obras ativas no momento. Cadastre uma meta em Configurações > Metas para acompanhar o progresso.`,
     });
 
     return list;
-  }, [stats, etapaGargalo]);
+  }, [stats, etapaGargalo, metaObrasAtivas]);
 
   const maxTempo = Math.max(...stats.tempoMedioEtapa.map((t) => t.media), 1);
 
@@ -328,16 +330,16 @@ export default function DashboardObras({ obras }: Props) {
           valor={stats.ativas.length}
           cor="#3B82F6"
           varPeriodo={varObras}
-          varMeta={pctMeta(stats.ativas.length, META_OBRAS_ATIVAS)}
-          subMeta={`meta ${META_OBRAS_ATIVAS}`}
+          varMeta={metaObrasAtivas !== undefined ? pctMeta(stats.ativas.length, metaObrasAtivas) : undefined}
+          subMeta={metaObrasAtivas !== undefined ? `meta ${metaObrasAtivas}` : undefined}
         />
         <KPICard
           label="Valor Liberado (Caixa)"
           valor={fmtBRL(stats.valMes)}
           cor="#10B981"
           varPeriodo={varValor}
-          varMeta={pctMeta(stats.valMes, META_VALOR_MENSAL)}
-          subMeta={`meta ${fmtBRL(META_VALOR_MENSAL)}`}
+          varMeta={metaValorMensal !== undefined ? pctMeta(stats.valMes, metaValorMensal) : undefined}
+          subMeta={metaValorMensal !== undefined ? `meta ${fmtBRL(metaValorMensal)}` : undefined}
         />
         <KPICard
           label="Medições Pendentes"

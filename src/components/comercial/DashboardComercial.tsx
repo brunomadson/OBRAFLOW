@@ -4,6 +4,7 @@ import { ETAPAS_LEAD } from "@/constants/etapas";
 import { fmtBRL } from "@/lib/utils";
 import Badge from "@/components/ui/Badge";
 import Modal, { ModalHeader } from "@/components/ui/Modal";
+import { useMetas } from "@/hooks/useMetas";
 import type { Lead } from "@/types/app.types";
 
 interface Props {
@@ -256,8 +257,13 @@ function GeradoresNegocio({ leads, onEdit }: { leads: Lead[]; onEdit?: (lead: Le
 export default function DashboardComercial({ leads, onEdit }: Props) {
   const [periodo, setPeriodo] = useState("30");
   const dias = Number(periodo);
+  const metas = useMetas();
 
   const pct = (a: number, b: number): number | null => b === 0 ? null : Math.round(((a - b) / b) * 100);
+  // Metas cadastradas são mensais; escala pro período selecionado (7D/30D/etc.)
+  // pra não comparar "leads dos últimos 7 dias" direto com uma meta de 30 dias.
+  const metaPeriodo = (metaMensal: number | undefined) =>
+    metaMensal === undefined ? undefined : metaMensal * (dias / 30);
 
   const { noperiodo, noprev, origens, meses } = useMemo(() => {
     const corte = subDias(dias);
@@ -328,10 +334,10 @@ export default function DashboardComercial({ leads, onEdit }: Props) {
 
       {/* KPIs */}
       <div className="grid grid-cols-4 gap-3.5 mb-5">
-        <KPI label="Oportunidades"     valor={totalLeads}          varPct={pct(totalLeads, prevLeads)}  meta={pct(totalLeads, Math.ceil(prevLeads * 1.3) || 10)} />
-        <KPI label="Valor Potencial"   valor={fmtBRL(valPot)}      varPct={pct(valPot, prevVal)}        meta={pct(valPot, Math.ceil(prevVal * 1.3) || 500000)} />
+        <KPI label="Oportunidades"     valor={totalLeads}          varPct={pct(totalLeads, prevLeads)}  meta={pct(totalLeads, metaPeriodo(metas.comercial_oportunidades) ?? 0) ?? undefined} />
+        <KPI label="Valor Potencial"   valor={fmtBRL(valPot)}      varPct={pct(valPot, prevVal)}        meta={pct(valPot, metaPeriodo(metas.comercial_valor_potencial) ?? 0) ?? undefined} />
         <KPI label="Ticket Médio"      valor={fmtBRL(totalLeads > 0 ? Math.round(valPot / totalLeads) : 0)} varPct={pct(totalLeads > 0 ? valPot / totalLeads : 0, prevLeads > 0 ? prevVal / prevLeads : 0)} />
-        <KPI label="Taxa de Conversão" valor={`${taxaConv}%`}      varPct={pct(taxaConv, prevTaxa)}     meta={pct(taxaConv, 15)} />
+        <KPI label="Taxa de Conversão" valor={`${taxaConv}%`}      varPct={pct(taxaConv, prevTaxa)}     meta={metas.comercial_taxa_conversao !== undefined ? pct(taxaConv, metas.comercial_taxa_conversao) ?? undefined : undefined} />
       </div>
 
       {/* Gráficos */}
@@ -421,7 +427,7 @@ export default function DashboardComercial({ leads, onEdit }: Props) {
         <div className="grid grid-cols-3 gap-3">
           {[
             { cor: "#10B981", bg: "#F0FDF4", titulo: "✅ O que cresceu",    texto: aprovados > prevAprov ? `Propostas aprovadas subiram de ${prevAprov} para ${aprovados}.` : `${totalLeads} leads no período. Mantenha a cadência.` },
-            { cor: "#F97316", bg: "#FFF7ED", titulo: "⚠ O que preocupa",   texto: noperiodo.filter((l) => l.etapa === "analise").length > 2 ? `${noperiodo.filter((l) => l.etapa === "analise").length} leads em análise. Contate a Caixa.` : `Taxa: ${taxaConv}%. Meta: 15%.` },
+            { cor: "#F97316", bg: "#FFF7ED", titulo: "⚠ O que preocupa",   texto: noperiodo.filter((l) => l.etapa === "analise").length > 2 ? `${noperiodo.filter((l) => l.etapa === "analise").length} leads em análise. Contate a Caixa.` : `Taxa: ${taxaConv}%.${metas.comercial_taxa_conversao !== undefined ? ` Meta: ${metas.comercial_taxa_conversao}%.` : ""}` },
             { cor: "#3B82F6", bg: "#EFF6FF", titulo: "🎯 Ação recomendada", texto: origens[0] ? `"${origens[0][0]}" é sua principal origem (${origens[0][1]} leads). Invista mais.` : "Cadastre oportunidades para receber insights." },
           ].map((ins) => (
             <div key={ins.titulo} className="rounded-xl p-4 border-l-[3px]" style={{ background: ins.bg, borderLeftColor: ins.cor }}>

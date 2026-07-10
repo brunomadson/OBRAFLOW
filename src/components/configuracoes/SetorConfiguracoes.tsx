@@ -3,14 +3,97 @@ import { useState, useEffect, useCallback } from "react";
 import ModalMembro from "./ModalMembro";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
-import { GRUPOS_CONFIG, CONFIG_PADRAO } from "@/constants/config";
+import { GRUPOS_CONFIG, CONFIG_PADRAO, GRUPOS_METAS } from "@/constants/config";
 import { getConfig, saveConfig } from "@/services/config.service";
+import { getMetas, upsertMeta, periodoAtual } from "@/services/metas.service";
+import CurrencyInput from "@/components/ui/CurrencyInput";
 import { getProfiles, upsertProfile } from "@/services/profiles.service";
 import { createClient } from "@/lib/supabase/client";
-import type { Profile, ConfigPrazos } from "@/types/app.types";
+import type { Profile, ConfigPrazos, IndicadorMeta } from "@/types/app.types";
 import toast from "react-hot-toast";
 
-type Aba = "prazos" | "membros" | "integracoes";
+type Aba = "prazos" | "metas" | "membros" | "integracoes";
+
+/* ---- Aba Metas ---- */
+function AbaMetas() {
+  const [valores, setValores] = useState<Partial<Record<IndicadorMeta, number>>>({});
+  const [loading, setLoading] = useState(true);
+  const [savingKey, setSavingKey] = useState<IndicadorMeta | null>(null);
+  const periodo = periodoAtual();
+
+  useEffect(() => {
+    getMetas(periodo)
+      .then((rows) => {
+        const map: Partial<Record<IndicadorMeta, number>> = {};
+        rows.forEach((r) => { map[r.indicador] = Number(r.valor_meta); });
+        setValores(map);
+      })
+      .finally(() => setLoading(false));
+  }, [periodo]);
+
+  const handleSave = async (indicador: IndicadorMeta) => {
+    setSavingKey(indicador);
+    try {
+      await upsertMeta(indicador, periodo, valores[indicador] ?? 0);
+      toast.success("Meta salva!");
+    } catch { toast.error("Erro ao salvar meta."); }
+    finally { setSavingKey(null); }
+  };
+
+  if (loading) return <p className="text-sm text-slate-400">Carregando...</p>;
+
+  const mesLabel = new Date(periodo + "-01T00:00:00").toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+
+  return (
+    <div className="max-w-2xl">
+      <p className="text-xs text-slate-400 mb-4">
+        Metas de <span className="font-semibold text-slate-600 capitalize">{mesLabel}</span> — usadas nos comparativos &quot;Meta x Realizado&quot; das dashboards. Cada mês tem sua própria meta.
+      </p>
+      {GRUPOS_METAS.map((grupo) => (
+        <div key={grupo.id} className="card p-5 mb-4">
+          <p className="text-[13px] font-bold text-slate-900 mb-3">{grupo.emoji} {grupo.label}</p>
+          <div className="space-y-3">
+            {grupo.itens.map((campo) => (
+              <div key={campo.indicador} className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-[13px] text-slate-700 font-medium">{campo.label}</p>
+                  <p className="text-[11px] text-slate-400">{campo.desc}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {campo.tipo === "moeda" ? (
+                    <CurrencyInput
+                      value={valores[campo.indicador] ?? null}
+                      onChange={(v) => setValores((p) => ({ ...p, [campo.indicador]: v }))}
+                      className="w-32 text-center"
+                    />
+                  ) : (
+                    <input
+                      type="number"
+                      min={0}
+                      max={campo.tipo === "percentual" ? 100 : undefined}
+                      value={valores[campo.indicador] ?? 0}
+                      onChange={(e) => setValores((p) => ({ ...p, [campo.indicador]: Number(e.target.value) }))}
+                      className="input-base w-24 text-center"
+                    />
+                  )}
+                  <span className="text-xs text-slate-400 w-4">{campo.tipo === "percentual" ? "%" : ""}</span>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    loading={savingKey === campo.indicador}
+                    onClick={() => handleSave(campo.indicador)}
+                  >
+                    Salvar
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 /* ---- Aba Prazos ---- */
 function AbaPrazos() {
@@ -174,7 +257,7 @@ function AbaIntegracoes() {
 /* ---- Main ---- */
 export default function SetorConfiguracoes() {
   const [aba, setAba] = useState<Aba>("prazos");
-  const tabs: [Aba, string][] = [["prazos", "Prazos"], ["membros", "Membros"], ["integracoes", "Integrações"]];
+  const tabs: [Aba, string][] = [["prazos", "Prazos"], ["metas", "Metas"], ["membros", "Membros"], ["integracoes", "Integrações"]];
 
   return (
     <div>
@@ -185,6 +268,7 @@ export default function SetorConfiguracoes() {
       </div>
       <div className="p-6 max-w-[1400px] mx-auto">
         {aba === "prazos"      && <AbaPrazos />}
+        {aba === "metas"       && <AbaMetas />}
         {aba === "membros"     && <AbaMembros />}
         {aba === "integracoes" && <AbaIntegracoes />}
       </div>

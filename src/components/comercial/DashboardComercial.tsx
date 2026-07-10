@@ -3,10 +3,12 @@ import { useState, useMemo } from "react";
 import { ETAPAS_LEAD } from "@/constants/etapas";
 import { fmtBRL } from "@/lib/utils";
 import Badge from "@/components/ui/Badge";
+import Modal, { ModalHeader } from "@/components/ui/Modal";
 import type { Lead } from "@/types/app.types";
 
 interface Props {
   leads: Lead[];
+  onEdit?: (lead: Lead) => void;
 }
 
 function subDias(n: number) {
@@ -41,28 +43,90 @@ function KPI({ label, valor, varPct, meta }: { label: string; valor: string | nu
 
 const PERIODOS: [string, string][] = [["7","7D"],["30","30D"],["90","90D"],["180","180D"],["365","360D"]];
 
+/* ─── Identifica o gerador (corretor/indicação) de um lead, se houver ────────
+   Ignora canais de marketing (Instagram, Tráfego pago, Captação ativa etc.) */
+function geradorDoLead(l: Lead): { nome: string; tipo: "Corretor" | "Indicação" } | null {
+  if (l.origem === "Corretor")   return { nome: l.corretor?.trim() || "Corretor sem nome", tipo: "Corretor" };
+  if (l.origem === "Indicação")  return { nome: l.indicado_por?.trim() || "Indicação sem nome", tipo: "Indicação" };
+  return null;
+}
+
+interface FiltroGerador { tipo: "Corretor" | "Indicação"; nome: string; apenasAprovados: boolean }
+
+/* ─── Modal: leads de um corretor/indicador específico ──────────────────────
+   Mesmo padrão do "A Vencer / Vencidos" do Financeiro: clicar num indicador
+   abre um relatório filtrado, com atalho para abrir o lead completo. */
+function ModalRelatorioGerador({ filtro, leads, onClose, onEdit }: {
+  filtro: FiltroGerador;
+  leads: Lead[];
+  onClose: () => void;
+  onEdit?: (lead: Lead) => void;
+}) {
+  const filtrados = leads.filter((l) => {
+    const g = geradorDoLead(l);
+    if (!g || g.tipo !== filtro.tipo || g.nome !== filtro.nome) return false;
+    return !filtro.apenasAprovados || l.etapa === "aprovada";
+  });
+  const valorTotal = filtrados.reduce((s, l) => s + (Number(l.valor_venda) || 0), 0);
+
+  return (
+    <Modal onClose={onClose} size="lg" zIndex={1100}>
+      <ModalHeader
+        title={filtro.nome}
+        label={filtro.tipo}
+        labelColor={filtro.tipo === "Corretor" ? "#3B82F6" : "#F59E0B"}
+        subtitle={filtro.apenasAprovados ? "Contratos aprovados no período" : "Todos os leads no período"}
+        onClose={onClose}
+      />
+      <div className="p-5 space-y-2 max-h-[60vh] overflow-y-auto">
+        {filtrados.length === 0 && (
+          <p className="text-center text-slate-400 py-8 text-sm">Nenhum lead encontrado</p>
+        )}
+        {filtrados.map((l, i) => {
+          const etapa = ETAPAS_LEAD.find((e) => e.id === l.etapa);
+          return (
+            <button
+              key={l.id}
+              onClick={() => { onEdit?.(l); onClose(); }}
+              className={`w-full flex items-center justify-between gap-3 p-3 rounded-xl border text-left cursor-pointer transition-colors hover:border-blue-300 ${i % 2 === 0 ? "bg-slate-50" : "bg-white"}`}
+            >
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-semibold text-slate-800 truncate">{l.nome}</p>
+                <p className="text-[11px] text-slate-400">{l.cidade || "—"}</p>
+              </div>
+              {etapa && <Badge color={etapa.cor}>{etapa.label}</Badge>}
+              <div className="ml-2 text-right flex-shrink-0 w-24">
+                <p className="text-[13px] font-bold text-slate-700">{fmtBRL(l.valor_venda)}</p>
+              </div>
+            </button>
+          );
+        })}
+        {filtrados.length > 0 && (
+          <div className="pt-2 border-t border-slate-100 flex justify-between text-[13px] font-bold text-slate-700">
+            <span>{filtrados.length} lead{filtrados.length !== 1 ? "s" : ""}</span>
+            <span>{fmtBRL(valorTotal)}</span>
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
 /* ─── Geradores de Negócio: Corretores parceiros & Indicações pessoais ──────
    Mede quem traz oportunidades de verdade (parceiros e pessoas), não canal
    de marketing — por isso ignora Instagram/Tráfego pago/Captação ativa/etc. */
-function GeradoresNegocio({ leads }: { leads: Lead[] }) {
+function GeradoresNegocio({ leads, onEdit }: { leads: Lead[]; onEdit?: (lead: Lead) => void }) {
+  const [filtro, setFiltro] = useState<FiltroGerador | null>(null);
+
   const geradores = useMemo(() => {
     const map: Record<string, { nome: string; tipo: "Corretor" | "Indicação"; leads: number; aprovados: number }> = {};
 
     leads.forEach((l) => {
-      let nome: string | null = null;
-      let tipo: "Corretor" | "Indicação" | null = null;
+      const g = geradorDoLead(l);
+      if (!g) return; // ignora canais de marketing (Instagram, Tráfego pago, etc.)
 
-      if (l.origem === "Corretor") {
-        nome = l.corretor?.trim() || "Corretor sem nome";
-        tipo = "Corretor";
-      } else if (l.origem === "Indicação") {
-        nome = l.indicado_por?.trim() || "Indicação sem nome";
-        tipo = "Indicação";
-      }
-      if (!nome || !tipo) return; // ignora canais de marketing (Instagram, Tráfego pago, etc.)
-
-      const key = `${tipo}:${nome}`;
-      if (!map[key]) map[key] = { nome, tipo, leads: 0, aprovados: 0 };
+      const key = `${g.tipo}:${g.nome}`;
+      if (!map[key]) map[key] = { nome: g.nome, tipo: g.tipo, leads: 0, aprovados: 0 };
       map[key].leads += 1;
       if (l.etapa === "aprovada") map[key].aprovados += 1;
     });
@@ -108,12 +172,16 @@ function GeradoresNegocio({ leads }: { leads: Lead[] }) {
         ) : (
           <div className="space-y-3">
             {geradores.map((g, i) => (
-              <div key={`${g.tipo}:${g.nome}`} className="flex items-center gap-3">
+              <button
+                key={`${g.tipo}:${g.nome}`}
+                onClick={() => setFiltro({ tipo: g.tipo, nome: g.nome, apenasAprovados: false })}
+                className="w-full flex items-center gap-3 bg-transparent border-none p-0 cursor-pointer text-left group"
+              >
                 <span className="text-[11px] font-bold text-slate-300 w-4 text-right flex-shrink-0">{i + 1}</span>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2 mb-1">
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="text-xs font-semibold text-slate-800 truncate">{g.nome}</span>
+                      <span className="text-xs font-semibold text-slate-800 truncate group-hover:text-blue-600 transition-colors">{g.nome}</span>
                       <Badge color={g.tipo === "Corretor" ? "#3B82F6" : "#F59E0B"}>{g.tipo}</Badge>
                     </div>
                     <span className="text-xs font-bold text-slate-700 flex-shrink-0">{g.leads}</span>
@@ -125,9 +193,9 @@ function GeradoresNegocio({ leads }: { leads: Lead[] }) {
                     />
                   </div>
                 </div>
-              </div>
+              </button>
             ))}
-            <p className="text-[10px] text-slate-400 pt-1">{totalLeads} lead{totalLeads !== 1 ? "s" : ""} via corretor/indicação no período.</p>
+            <p className="text-[10px] text-slate-400 pt-1">{totalLeads} lead{totalLeads !== 1 ? "s" : ""} via corretor/indicação no período. Clique num nome para ver os leads dele.</p>
           </div>
         )}
       </div>
@@ -143,7 +211,15 @@ function GeradoresNegocio({ leads }: { leads: Lead[] }) {
           <div className="flex items-center gap-6">
             <svg width="120" height="120" viewBox="0 0 120 120" className="flex-shrink-0">
               {fatias.map((s, i) => (
-                <path key={i} d={s.path} fill={s.cor} stroke="#fff" strokeWidth="2">
+                <path
+                  key={i}
+                  d={s.path}
+                  fill={s.cor}
+                  stroke="#fff"
+                  strokeWidth="2"
+                  className="cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={() => setFiltro({ tipo: s.tipo, nome: s.nome, apenasAprovados: true })}
+                >
                   <title>{s.nome}: {s.aprovados}</title>
                 </path>
               ))}
@@ -153,23 +229,31 @@ function GeradoresNegocio({ leads }: { leads: Lead[] }) {
             </svg>
             <div className="flex-1 space-y-1.5 min-w-0">
               {fatias.map((s) => (
-                <div key={`${s.tipo}:${s.nome}`} className="flex items-center justify-between gap-2">
+                <button
+                  key={`${s.tipo}:${s.nome}`}
+                  onClick={() => setFiltro({ tipo: s.tipo, nome: s.nome, apenasAprovados: true })}
+                  className="w-full flex items-center justify-between gap-2 bg-transparent border-none p-0 cursor-pointer group"
+                >
                   <div className="flex items-center gap-1.5 min-w-0">
                     <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.cor }} />
-                    <span className="text-[11px] text-slate-700 truncate">{s.nome}</span>
+                    <span className="text-[11px] text-slate-700 truncate group-hover:text-blue-600 transition-colors">{s.nome}</span>
                   </div>
                   <span className="text-[11px] font-bold flex-shrink-0" style={{ color: s.cor }}>{s.aprovados}</span>
-                </div>
+                </button>
               ))}
             </div>
           </div>
         )}
       </div>
+
+      {filtro && (
+        <ModalRelatorioGerador filtro={filtro} leads={leads} onClose={() => setFiltro(null)} onEdit={onEdit} />
+      )}
     </div>
   );
 }
 
-export default function DashboardComercial({ leads }: Props) {
+export default function DashboardComercial({ leads, onEdit }: Props) {
   const [periodo, setPeriodo] = useState("30");
   const dias = Number(periodo);
 
@@ -329,7 +413,7 @@ export default function DashboardComercial({ leads }: Props) {
       </div>
 
       {/* Geradores de Negócio: Corretores parceiros & Indicações pessoais */}
-      <GeradoresNegocio leads={noperiodo} />
+      <GeradoresNegocio leads={noperiodo} onEdit={onEdit} />
 
       {/* Insights */}
       <div className="card p-5">

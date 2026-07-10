@@ -72,7 +72,7 @@ export default function SetorComercial() {
           </div>
         ) : (
           <>
-            {aba === "dashboard" && <DashboardComercial leads={leads} />}
+            {aba === "dashboard" && <DashboardComercial leads={leads} onEdit={setModalLead} />}
             {aba === "pipeline"  && (
               <Pipeline
                 leads={leadsFiltrados}

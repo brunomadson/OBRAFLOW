@@ -31,6 +31,11 @@ function AbaPrazos() {
     finally { setSaving(false); }
   };
 
+  const handleRestaurarPadrao = () => {
+    setConfig(CONFIG_PADRAO);
+    toast.success("Valores padrão restaurados. Clique em \"Salvar Configurações\" para aplicar.");
+  };
+
   if (loading) return <p className="text-sm text-slate-400">Carregando...</p>;
 
   return (
@@ -60,7 +65,10 @@ function AbaPrazos() {
           </div>
         </div>
       ))}
-      <Button variant="primary" onClick={handleSave} loading={saving}>Salvar Configurações</Button>
+      <div className="flex gap-2">
+        <Button variant="primary" onClick={handleSave} loading={saving}>Salvar Configurações</Button>
+        <Button variant="secondary" onClick={handleRestaurarPadrao} disabled={saving}>Restaurar Padrão</Button>
+      </div>
     </div>
   );
 }

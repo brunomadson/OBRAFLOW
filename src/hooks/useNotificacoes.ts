@@ -1,7 +1,7 @@
 "use client";
 import { useMemo } from "react";
 import type { Lead, Obra, Lancamento, ConfigPrazos, Notificacao } from "@/types/app.types";
-import { horasDecorridas, diasDecorridos, diasUteisDecorridos } from "@/lib/utils";
+import { horasDecorridas, diasDecorridos, diasUteisDecorridos, parseBRDate } from "@/lib/utils";
 
 export function useNotificacoes(
   leads: Lead[],
@@ -104,6 +104,82 @@ export function useNotificacoes(
                 mensagem: `${dias} de ${cfg.projeto_arquitetonico_dias} dias para entrega do arquitetônico.`,
                 dias,
                 prazo: cfg.projeto_arquitetonico_dias,
+                unidade: "d",
+              });
+            }
+          }
+        }
+      }
+
+      // ─── Engenharia Caixa (vistoria/laudo) ────────────────────────────────────
+      if (obra.etapa === "eng_caixa" && obra.eng_caixa) {
+        const eng = obra.eng_caixa;
+        const vistoriaOk = eng.vistoriaRealizada === "concluido";
+        const laudoOk     = eng.laudoEmitido === "concluido";
+
+        // 1. Alerta — Vistoria: dias desde a solicitação sem vistoria realizada.
+        if (eng.dtSolicitado && !vistoriaOk) {
+          const dias = diasDecorridos(eng.dtSolicitado) ?? 0;
+          if (dias >= cfg.solicitacao_eng_alerta_dias) {
+            notifs.push({
+              id: id(),
+              tipo: "critico",
+              setor: "obras",
+              titulo: `Vistoria pendente — ${obra.nome}`,
+              mensagem: `${dias} dias desde a solicitação sem vistoria realizada. Prazo: ${cfg.solicitacao_eng_alerta_dias} dias.`,
+              dias,
+              prazo: cfg.solicitacao_eng_alerta_dias,
+              unidade: "d",
+            });
+          }
+        }
+
+        // 2. Alerta — Laudo: dias desde a vistoria realizada sem laudo emitido.
+        if (eng.dtVistoria && vistoriaOk && !laudoOk) {
+          const dias = diasDecorridos(eng.dtVistoria) ?? 0;
+          if (dias >= cfg.vistoria_eng_caixa_dias) {
+            notifs.push({
+              id: id(),
+              tipo: "critico",
+              setor: "obras",
+              titulo: `Laudo pendente — ${obra.nome}`,
+              mensagem: `${dias} dias desde a vistoria sem laudo emitido. Prazo: ${cfg.vistoria_eng_caixa_dias} dias.`,
+              dias,
+              prazo: cfg.vistoria_eng_caixa_dias,
+              unidade: "d",
+            });
+          }
+        }
+
+        // 3. Prazo — Vistoria e Laudo: tempo total do processo (solicitação → laudo).
+        if (eng.dtSolicitado) {
+          if (laudoOk && eng.dtLaudo) {
+            const inicio = parseBRDate(eng.dtSolicitado);
+            const fim    = parseBRDate(eng.dtLaudo);
+            const totalDias = inicio && fim ? Math.round((fim.getTime() - inicio.getTime()) / 86_400_000) : 0;
+            if (totalDias > cfg.laudo_eng_caixa_dias) {
+              notifs.push({
+                id: id(),
+                tipo: "alerta",
+                setor: "obras",
+                titulo: `Prazo de engenharia excedido — ${obra.nome}`,
+                mensagem: `Processo levou ${totalDias} dias da solicitação ao laudo. Prazo configurado: ${cfg.laudo_eng_caixa_dias} dias.`,
+                dias: totalDias,
+                prazo: cfg.laudo_eng_caixa_dias,
+                unidade: "d",
+              });
+            }
+          } else if (!laudoOk) {
+            const dias = diasDecorridos(eng.dtSolicitado) ?? 0;
+            if (dias >= cfg.laudo_eng_caixa_dias) {
+              notifs.push({
+                id: id(),
+                tipo: "critico",
+                setor: "obras",
+                titulo: `Prazo de engenharia vencido — ${obra.nome}`,
+                mensagem: `${dias} dias desde a solicitação sem laudo emitido. Prazo total: ${cfg.laudo_eng_caixa_dias} dias.`,
+                dias,
+                prazo: cfg.laudo_eng_caixa_dias,
                 unidade: "d",
               });
             }

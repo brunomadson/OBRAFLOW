@@ -55,10 +55,9 @@ export const GRUPOS_CONFIG = [
     emoji: "🏦",
     cor: "#F97316",
     itens: [
-      { key: "solicitacao_eng_alerta_dias",  label: "Alerta — Solicitação sem vistoria",  desc: "Dias após 'Solicitado' sem vistoria registrada.",               unidade: "dias" },
-      { key: "vistoria_eng_caixa_dias",      label: "Prazo — Vistoria após envio",        desc: "Dias para vistoria após envio da medição à Caixa.",             unidade: "dias" },
-      { key: "laudo_eng_caixa_dias",         label: "Prazo — Laudo após envio",           desc: "Dias para laudo após envio da medição.",                        unidade: "dias" },
-      { key: "laudo_apos_solicitada_dias",   label: "Prazo — Laudo após Solicitada",      desc: "Dias após medição 'Solicitada' para laudo emitido.",            unidade: "dias" },
+      { key: "solicitacao_eng_alerta_dias",  label: "Alerta — Vistoria",             desc: "Dias após solicitar a vistoria sem 'Vistoria Realizada'.",         unidade: "dias" },
+      { key: "vistoria_eng_caixa_dias",      label: "Alerta — Laudo",                desc: "Dias após 'Vistoria Realizada' sem 'Laudo Emitido'.",              unidade: "dias" },
+      { key: "laudo_eng_caixa_dias",         label: "Prazo — Vistoria e Laudo",      desc: "Dias totais entre a solicitação da vistoria e o laudo emitido.",   unidade: "dias" },
     ],
   },
   {
@@ -80,6 +79,7 @@ export const GRUPOS_CONFIG = [
     itens: [
       { key: "pls_intervalo_dias",           label: "Intervalo máximo entre medições",       desc: "Dias máximos entre medições na fase de execução.",           unidade: "dias" },
       { key: "pls_alerta_dias",              label: "Alerta de PLS",                         desc: "Dias para alerta antes do intervalo máximo.",               unidade: "dias" },
+      { key: "laudo_apos_solicitada_dias",   label: "Prazo — Laudo após Solicitada",         desc: "Dias após medição 'Solicitada' para laudo emitido.",         unidade: "dias" },
       { key: "pagamento_apos_laudo_dias",    label: "Prazo — Pagamento após laudo",          desc: "Dias para liberação do pagamento após laudo emitido.",       unidade: "dias" },
       { key: "pagamento_apos_laudo_alerta",  label: "Alerta antecipado — Pagamento",         desc: "Dias antes do prazo de pagamento para alerta.",             unidade: "dias" },
     ],

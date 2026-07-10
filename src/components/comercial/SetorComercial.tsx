@@ -1,20 +1,32 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useLeads } from "@/hooks/useLeads";
+import { getCorrespondentes } from "@/services/correspondentes.service";
 import DashboardComercial from "./DashboardComercial";
 import Pipeline from "./Pipeline";
 import TabelaPropostas from "./TabelaPropostas";
-import ModalLead from "./ModalLead";
+import ModalLead, { ModalAgendarReuniao, ModalAnalise, ModalResultado } from "./ModalLead";
 import { SkeletonCard } from "@/components/ui/Skeleton";
-import type { Lead } from "@/types/app.types";
+import type { Lead, EtapaLead, Correspondente } from "@/types/app.types";
 
 type Aba = "dashboard" | "pipeline" | "propostas";
+
+// Etapas que exigem dados extras antes de confirmar a movimentação (mesma
+// regra do botão "Avançar" no ModalLead) — mover por drag-and-drop pra uma
+// dessas colunas abre o mesmo sub-modal, não pula direto pra etapa.
+const ETAPAS_COM_FORM = new Set<EtapaLead>(["reuniao", "analise", "aprovada", "reprovada"]);
 
 export default function SetorComercial() {
   const { leads, loading, salvar, avancarEtapa, enviarParaObras } = useLeads();
   const [aba, setAba]       = useState<Aba>("dashboard");
   const [busca, setBusca]   = useState("");
   const [modalLead, setModalLead] = useState<Lead | "novo" | null>(null);
+  const [correspondentes, setCorrespondentes] = useState<Correspondente[]>([]);
+  const [pendente, setPendente] = useState<{ lead: Lead; novaEtapa: EtapaLead } | null>(null);
+
+  useEffect(() => {
+    getCorrespondentes().then(setCorrespondentes).catch(() => {});
+  }, []);
 
   const leadsFiltrados = useMemo(
     () =>
@@ -31,6 +43,19 @@ export default function SetorComercial() {
     ["pipeline",  "Pipeline de Vendas"],
     ["propostas", "Propostas em Andamento"],
   ];
+
+  const handleMoveEtapa = (leadId: string, novaEtapa: EtapaLead) => {
+    const lead = leads.find((l) => l.id === leadId);
+    if (!lead) return;
+    if (ETAPAS_COM_FORM.has(novaEtapa)) {
+      // Abre o mesmo formulário do ModalLead em vez de avançar direto —
+      // se o usuário cancelar, o card simplesmente volta pra coluna
+      // original (a etapa nunca chegou a mudar no estado).
+      setPendente({ lead, novaEtapa });
+    } else {
+      avancarEtapa(leadId, novaEtapa);
+    }
+  };
 
   return (
     <div>
@@ -78,7 +103,7 @@ export default function SetorComercial() {
                 leads={leadsFiltrados}
                 onEdit={setModalLead}
                 onAddLead={() => setModalLead("novo")}
-                onMoveEtapa={async (id, etapa) => { await avancarEtapa(id, etapa); }}
+                onMoveEtapa={handleMoveEtapa}
               />
             )}
             {aba === "propostas" && (
@@ -98,6 +123,52 @@ export default function SetorComercial() {
           }}
           onAvancar={async (id, etapa, extras) => { await avancarEtapa(id, etapa, extras); }}
           onEnviarObras={async (id) => { await enviarParaObras(id); }}
+        />
+      )}
+
+      {/* Sub-modais disparados ao arrastar um card pra uma etapa que exige
+          dados extras — mesmos componentes usados dentro do ModalLead. */}
+      {pendente?.novaEtapa === "reuniao" && (
+        <ModalAgendarReuniao
+          nomeLead={pendente.lead.nome}
+          onClose={() => setPendente(null)}
+          onConfirm={async (d) => {
+            await avancarEtapa(pendente.lead.id, "reuniao", {
+              data_reuniao: d.data,
+              local_reuniao: d.local,
+            });
+            setPendente(null);
+          }}
+        />
+      )}
+      {pendente?.novaEtapa === "analise" && (
+        <ModalAnalise
+          nomeLead={pendente.lead.nome}
+          correspondentes={correspondentes}
+          onClose={() => setPendente(null)}
+          onConfirm={async (d) => {
+            await avancarEtapa(pendente.lead.id, "analise", {
+              correspondente_id: d.correspondente_id,
+              pls: d.pls,
+              obs: d.obs,
+            });
+            setPendente(null);
+          }}
+        />
+      )}
+      {(pendente?.novaEtapa === "aprovada" || pendente?.novaEtapa === "reprovada") && (
+        <ModalResultado
+          nomeLead={pendente.lead.nome}
+          initial={pendente.novaEtapa}
+          onClose={() => setPendente(null)}
+          onAprovar={async (obs) => {
+            await avancarEtapa(pendente.lead.id, "aprovada", { obs });
+            setPendente(null);
+          }}
+          onReprovar={async (motivo) => {
+            await avancarEtapa(pendente.lead.id, "reprovada", { obs: motivo });
+            setPendente(null);
+          }}
         />
       )}
     </div>

@@ -371,7 +371,7 @@ function ModalGerenciarCidades({
 }
 
 /* ───────── sub-modal: Agendar Reunião ────────────────────────────────────── */
-function ModalAgendarReuniao({ onClose, onConfirm, nomeLead }: {
+export function ModalAgendarReuniao({ onClose, onConfirm, nomeLead }: {
   onClose: () => void;
   onConfirm: (d: { data: string; local: string; hora: string }) => void;
   nomeLead: string;
@@ -462,7 +462,7 @@ function ModalAgendarReuniao({ onClose, onConfirm, nomeLead }: {
 }
 
 /* ───────── sub-modal: Enviar para Análise de Crédito ────────────────────── */
-function ModalAnalise({ onClose, onConfirm, nomeLead, correspondentes }: {
+export function ModalAnalise({ onClose, onConfirm, nomeLead, correspondentes }: {
   onClose: () => void;
   onConfirm: (d: { correspondente_id: string | null; pls: string; obs: string }) => void;
   nomeLead: string;
@@ -521,13 +521,14 @@ function ModalAnalise({ onClose, onConfirm, nomeLead, correspondentes }: {
 }
 
 /* ───────── sub-modal: Resultado da Análise (bifurcação) ─────────────────── */
-function ModalResultado({ onClose, onAprovar, onReprovar, nomeLead }: {
+export function ModalResultado({ onClose, onAprovar, onReprovar, nomeLead, initial }: {
   onClose: () => void;
   onAprovar: (obs: string) => void;
   onReprovar: (motivo: string) => void;
   nomeLead: string;
+  initial?: "aprovada" | "reprovada";
 }) {
-  const [resultado, setResultado] = useState<"aprovada" | "reprovada" | "">("");
+  const [resultado, setResultado] = useState<"aprovada" | "reprovada" | "">(initial ?? "");
   const [motivo, setMotivo]       = useState(MOTIVOS_REPROVACAO[0]);
   const [obs, setObs]             = useState("");
 
@@ -1110,7 +1111,7 @@ export default function ModalLead({ lead, onClose, onSave, onAvancar, onEnviarOb
           nomeLead={form.nome ?? ""}
           onClose={() => setSubModal(null)}
           onAprovar={(obsAprov) => handleAvancar("aprovada",  { obs: obsAprov })}
-          onReprovar={(motivo)  => handleAvancar("reprovada", { motivo_reprovacao: motivo })}
+          onReprovar={(motivo)  => handleAvancar("reprovada", { obs: motivo })}
         />
       )}
       {subModal === "novoCorrespondente" && (

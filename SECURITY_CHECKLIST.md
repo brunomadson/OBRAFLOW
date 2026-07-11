@@ -16,6 +16,7 @@ verdade de segurança do projeto, não um documento de uma vez só.
 - [x] RLS ativo nas 20 tabelas do schema
 - [x] Isolamento por `workspace_id` validado entre dois workspaces reais (Sprint anterior)
 - [x] Tabelas-filho sem `workspace_id` próprio (`lead_log`, `obra_log`, `medicoes`) verificadas via subquery contra a tabela pai
+- [x] Teste automatizado de isolamento (`security-test.mjs`, `npm run security-test`) — cria 2 workspaces/usuários descartáveis, confirma que um não lê/apaga leads, obras, lançamentos nem arquivos do outro, e limpa tudo sozinho. Roda com segurança contra produção porque só toca dado que ele mesmo cria. 14/14 checagens passando (2026-07-11)
 - [ ] RBAC por cargo/setor **não existe em nenhuma policy** — hoje é só filtro de interface. Fora do escopo deste Sprint 0 (ver relatório da auditoria anterior)
 
 ## Storage

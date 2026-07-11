@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
+    "security-test": "node --env-file=.env.local security-test.mjs",
     "prepare": "husky"
   },
   "dependencies": {

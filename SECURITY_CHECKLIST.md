@@ -21,11 +21,11 @@ verdade de segurança do projeto, não um documento de uma vez só.
 ## Storage
 
 - [x] Bucket `documentos` confirmado como privado (`public: false`)
-- [x] Migration `025_storage_documentos_rls.sql` criada com policies de select/insert/update/delete por workspace
-- [ ] Migration aplicada no Supabase (pendente — rodar no SQL Editor)
-- [ ] Upload testado após aplicar a migration
-- [ ] Download (signed URL) testado após aplicar a migration
-- [ ] Confirmado que um usuário de outro workspace não acessa arquivo alheio
+- [x] Migration `025_storage_documentos_rls.sql` aplicada — policies de select/insert/update/delete por workspace
+- [x] Migration `026_remove_old_permissive_storage_policies.sql` aplicada — removeu 3 policies antigas (`documentos_select`/`_delete`/`_upload`) criadas manualmente no Dashboard que liberavam o bucket inteiro sem checar workspace. Sem essa remoção, a 025 sozinha não tinha efeito (RLS combina policies PERMISSIVE com OR)
+- [x] Upload testado com usuário autenticado real — funciona no próprio workspace
+- [x] Download (signed URL) testado com usuário autenticado real — funciona no próprio workspace
+- [x] Confirmado com usuário autenticado real que workspace A **não** acessa arquivo de workspace B (testado após a 026 — antes dela, o acesso vazava)
 
 ## Código
 

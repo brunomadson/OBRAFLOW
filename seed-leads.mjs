@@ -1,13 +1,8 @@
 // seed-leads.mjs
 // Preenche leads com campos novos e cria log de etapas com datas para a timeline
-// Rodar com: node --use-system-ca seed-leads.mjs
+// Rodar com: node --env-file=.env.local seed-leads.mjs
 
-import { createClient } from '@supabase/supabase-js';
-
-const sb = createClient(
-  'https://zrzqvdurgkqmoizlpeof.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpyenF2ZHVyZ2txbW9pemxwZW9mIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjUxNjIwOSwiZXhwIjoyMDk4MDkyMjA5fQ.QjStR__xmpYUyuChh6mxzs-ZMQzQXIXKSFNJs3pig7w'
-);
+import { sb } from './supabase-admin.mjs';
 
 // ─── Verificar migration ───────────────────────────────────────────────────────
 console.log('Verificando migration...');

@@ -2,12 +2,7 @@
 // Para DDL (ALTER TABLE, CREATE TABLE), use o SQL do arquivo migration.sql no Supabase Dashboard
 // https://supabase.com/dashboard/project/zrzqvdurgkqmoizlpeof/sql/new
 
-import { createClient } from '@supabase/supabase-js';
-
-const sb = createClient(
-  'https://zrzqvdurgkqmoizlpeof.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpyenF2ZHVyZ2txbW9pemxwZW9mIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjUxNjIwOSwiZXhwIjoyMDk4MDkyMjA5fQ.QjStR__xmpYUyuChh6mxzs-ZMQzQXIXKSFNJs3pig7w'
-);
+import { sb } from './supabase-admin.mjs';
 
 console.log('--- Testando se a migration foi executada ---');
 

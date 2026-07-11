@@ -2,6 +2,7 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useFinanceiro } from "@/hooks/useFinanceiro";
 import { useMetas } from "@/hooks/useMetas";
+import { usePermissoes } from "@/hooks/usePermissoes";
 import { getObras } from "@/services/obras.service";
 import { cn, compareValues, fmtBRL, fmtDate, nextSort, type SortState } from "@/lib/utils";
 import Button from "@/components/ui/Button";
@@ -1089,6 +1090,7 @@ function TabLancamentos({ lancamentos, obras, onEditar, onRemover, onPagar }: {
   onRemover: (id: string) => void;
   onPagar: (id: string) => void;
 }) {
+  const { pode } = usePermissoes();
   const [tipo, setTipo]     = useState<"todos" | "entrada" | "saida">("todos");
   const [obraF, setObraF]   = useState("");
   const [busca, setBusca]   = useState("");
@@ -1209,8 +1211,12 @@ function TabLancamentos({ lancamentos, obras, onEditar, onRemover, onPagar }: {
                           ✓ Pago
                         </button>
                       )}
-                      <button onClick={() => onEditar(l)} className="text-blue-400 hover:text-blue-600 text-[11px] font-semibold transition-colors">Editar</button>
-                      <button onClick={() => onRemover(l.id)} className="text-red-400 hover:text-red-600 text-[11px] font-semibold transition-colors">Excluir</button>
+                      {pode("financeiro", "editar") && (
+                        <button onClick={() => onEditar(l)} className="text-blue-400 hover:text-blue-600 text-[11px] font-semibold transition-colors">Editar</button>
+                      )}
+                      {pode("financeiro", "excluir") && (
+                        <button onClick={() => onRemover(l.id)} className="text-red-400 hover:text-red-600 text-[11px] font-semibold transition-colors">Excluir</button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -1393,6 +1399,7 @@ function TabPorObra({ lancamentos, obras }: { lancamentos: Lancamento[]; obras: 
 /* ─── SetorFinanceiro (main) ─────────────────────────────────────────────────── */
 export default function SetorFinanceiro() {
   const { lancamentos, loading, criar, criarVarios, editar, pagar, remover } = useFinanceiro();
+  const { pode } = usePermissoes();
   const [tab, setTab]         = useState<FinTab>("dashboard");
   const [obras, setObras]     = useState<Obra[]>([]);
   const [showModal, setShowModal]   = useState(false);
@@ -1444,12 +1451,14 @@ export default function SetorFinanceiro() {
             </button>
           ))}
         </div>
-        <button
-          onClick={() => { setEditLanc(null); setShowModal(true); }}
-          className="btn-primary text-xs px-3 py-1.5"
-        >
-          + Lançamento
-        </button>
+        {pode("financeiro", "criar") && (
+          <button
+            onClick={() => { setEditLanc(null); setShowModal(true); }}
+            className="btn-primary text-xs px-3 py-1.5"
+          >
+            + Lançamento
+          </button>
+        )}
       </div>
 
       {/* Content */}

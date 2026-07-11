@@ -55,11 +55,22 @@ async function criarTenant(label) {
   const userId = userResp.user.id;
   cleanup.userIds.push(userId);
 
+  // trigger workspaces_seed_cargos já semeou os 6 cargos padrão pro workspace
+  // de teste (RBAC, migration 027) — pega o cargo "CEO / Dono" pra dar acesso
+  // total, senão has_permission() nega tudo e os controles positivos falham.
+  const { data: cargoCeo, error: cargoErr } = await sb
+    .from('cargos')
+    .select('id')
+    .eq('workspace_id', ws.id)
+    .eq('nome', 'CEO / Dono')
+    .single();
+  if (cargoErr) throw new Error(`achar cargo CEO de ${label}: ${cargoErr.message}`);
+
   // trigger handle_new_user já criou o profile no workspace padrão — sobrescreve
   // pro workspace de teste, igual ao que /onboarding faz na aplicação real.
   const { error: pErr } = await sb
     .from('profiles')
-    .update({ workspace_id: ws.id, cargo: 'CEO / Dono', setores: ['comercial', 'obras', 'financeiro', 'configuracoes'] })
+    .update({ workspace_id: ws.id, cargo_id: cargoCeo.id })
     .eq('id', userId);
   if (pErr) throw new Error(`atualizar profile ${label}: ${pErr.message}`);
 

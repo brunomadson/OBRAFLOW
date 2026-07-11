@@ -17,7 +17,7 @@ verdade de segurança do projeto, não um documento de uma vez só.
 - [x] Isolamento por `workspace_id` validado entre dois workspaces reais (Sprint anterior)
 - [x] Tabelas-filho sem `workspace_id` próprio (`lead_log`, `obra_log`, `medicoes`) verificadas via subquery contra a tabela pai
 - [x] Teste automatizado de isolamento (`security-test.mjs`, `npm run security-test`) — cria 2 workspaces/usuários descartáveis, confirma que um não lê/apaga leads, obras, lançamentos nem arquivos do outro, e limpa tudo sozinho. Roda com segurança contra produção porque só toca dado que ele mesmo cria. 14/14 checagens passando (2026-07-11)
-- [ ] RBAC por cargo/setor **não existe em nenhuma policy** — hoje é só filtro de interface. Fora do escopo deste Sprint 0 (ver relatório da auditoria anterior)
+- [x] RBAC por cargo/setor implementado de verdade em RLS (migrations 027–032): tabela `cargos` (6 cargos padrão por workspace + customizados pelo CEO), `permissoes_cargo` (matriz visualizar/criar/editar/excluir × comercial/obras/financeiro/alertas/configurações), função `has_permission()`, RLS de `leads/lead_log/obras/obra_log/medicoes/lancamentos` exigindo permissão real além de `workspace_id`. Teste automatizado por cargo (`rbac-test.mjs`, `npm run rbac-test`) — 25/25 checagens passando (2026-07-11), inclusive a regra "Gerente não exclui lançamento" e "Estagiário/Engenheiro não excluem obra"
 
 ## Storage
 
@@ -33,10 +33,10 @@ verdade de segurança do projeto, não um documento de uma vez só.
 - [x] Nenhuma chave secreta hardcoded em nenhum arquivo de código (`.mjs`, `.ts`, `.tsx`) — confirmado por busca no repositório inteiro
 - [x] `service_role` nunca referenciada em `src/` (frontend) — confirmado
 - [x] Scripts locais (`seed-*.mjs`, `check-schema.mjs`, `run-migration.mjs`, `add-cor.mjs`, `reset-teste-demo.mjs`) migrados para ler a chave de variável de ambiente via `supabase-admin.mjs`
-- [ ] Chave antiga rotacionada no Supabase Dashboard (a chave que esteve exposta no histórico do git continua válida até isso ser feito manualmente — ver checklist de rotação no relatório do Sprint 0)
+- [x] Chave antiga rotacionada no Supabase Dashboard — `service_role`/`anon` antigos (legacy JWT) desabilitados, novas chaves `sb_secret_.../sb_publishable_...` em uso
 
 ## Deploy
 
-- [ ] Variáveis de ambiente confirmadas na Vercel (Production) — não verificável nesta sessão, sem acesso ao dashboard
-- [ ] Variáveis antigas (se houver) removidas da Vercel após a rotação da chave
-- [ ] `.env.local` confirmado fora do git (`git ls-files | grep .env` vazio — já confirmado nesta sessão)
+- [x] Variáveis de ambiente confirmadas na Vercel (Production) — `NEXT_PUBLIC_SUPABASE_ANON_KEY` atualizada pro novo formato, redeploy confirmado funcionando
+- [x] Variáveis antigas removidas da Vercel — `SUPABASE_SERVICE_ROLE_KEY` (não usada no client, só scripts locais) deletada
+- [x] `.env.local` confirmado fora do git (`git ls-files | grep .env` vazio — já confirmado nesta sessão)

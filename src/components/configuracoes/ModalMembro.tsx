@@ -2,10 +2,10 @@
 import { useState, useEffect } from "react";
 import Modal, { ModalHeader } from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
-import { CARGOS, SETORES_ACESSO } from "@/constants/dominios";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import type { Profile } from "@/types/app.types";
+import { getCargos } from "@/services/cargos.service";
+import type { Cargo, Profile } from "@/types/app.types";
 import toast from "react-hot-toast";
 
 interface Props {
@@ -14,31 +14,33 @@ interface Props {
   onSave: (data: Partial<Profile>) => Promise<void>;
 }
 
-const TODOS_SETORES = SETORES_ACESSO.map((s) => s.id);
-const isDono = (cargo: string) => cargo === "CEO / Dono";
-
 export default function ModalMembro({ membro, onClose, onSave }: Props) {
   const isNovo = !membro;
   const { profile } = useAuth();
   const supabase = createClient();
 
+  const [cargos, setCargos] = useState<Cargo[]>([]);
   const [form, setForm] = useState<Partial<Profile>>(
-    membro ?? { nome: "", cargo: CARGOS[0], setores: TODOS_SETORES, status: "ativo" }
+    membro ?? { nome: "", cargo_id: null, ativo: true }
   );
   const [email, setEmail] = useState("");
   const [saving, setSaving] = useState(false);
 
   const set = (k: keyof Profile, v: unknown) => setForm((p) => ({ ...p, [k]: v }));
 
-  // Quando cargo muda para CEO/Dono, auto-seleciona todos os setores
   useEffect(() => {
-    if (isDono(form.cargo ?? "")) {
-      set("setores", TODOS_SETORES);
-    }
-  }, [form.cargo]);
+    getCargos().then((lista) => {
+      setCargos(lista);
+      if (!form.cargo_id && lista.length > 0) set("cargo_id", lista[0].id);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const cargoSelecionado = cargos.find((c) => c.id === form.cargo_id);
 
   const handleSave = async () => {
     if (!form.nome?.trim()) { toast.error("Informe o nome"); return; }
+    if (!form.cargo_id) { toast.error("Selecione um cargo"); return; }
 
     if (isNovo) {
       if (!email.trim()) { toast.error("Informe o e-mail"); return; }
@@ -51,8 +53,8 @@ export default function ModalMembro({ membro, onClose, onSave }: Props) {
           .insert({
             email: email.trim().toLowerCase(),
             nome: form.nome?.trim(),
-            cargo: form.cargo ?? CARGOS[0],
-            setores: isDono(form.cargo ?? "") ? TODOS_SETORES : (form.setores ?? [SETORES_ACESSO[0].id]),
+            cargo: cargoSelecionado?.nome ?? "",
+            cargo_id: form.cargo_id,
             workspace_id: profile?.workspace_id,
             created_by: profile?.id,
           } as never);
@@ -92,12 +94,16 @@ export default function ModalMembro({ membro, onClose, onSave }: Props) {
       return;
     }
 
-    // Edição de membro existente
+    // Edição de membro existente — só nome/cargo_id/ativo. cargo (texto) e
+    // setores são recalculados automaticamente pelo trigger de sync a partir
+    // do cargo_id (ver migration 027), não precisa (nem deve) mandar direto.
     setSaving(true);
     try {
       await onSave({
-        ...form,
-        setores: isDono(form.cargo ?? "") ? TODOS_SETORES : form.setores,
+        id: form.id,
+        nome: form.nome,
+        cargo_id: form.cargo_id,
+        ativo: form.ativo,
       });
       toast.success("Membro atualizado!");
       onClose();
@@ -137,44 +143,23 @@ export default function ModalMembro({ membro, onClose, onSave }: Props) {
         <div>
           <label className="field-label">Cargo</label>
           <select
-            value={form.cargo ?? ""}
-            onChange={(e) => set("cargo", e.target.value)}
+            value={form.cargo_id ?? ""}
+            onChange={(e) => set("cargo_id", e.target.value)}
             className="input-base"
           >
-            {CARGOS.map((c) => <option key={c}>{c}</option>)}
+            {cargos.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
           </select>
+          <p className="text-[11px] text-slate-400 mt-1">
+            Setores e permissões desse cargo podem ser ajustados em Configurações → Cargos.
+          </p>
         </div>
-
-        {/* Setor de acesso: oculto para CEO/Dono (tem acesso a tudo automaticamente) */}
-        {!isDono(form.cargo ?? "") && (
-          <div>
-            <label className="field-label">Setor de Acesso</label>
-            <select
-              value={form.setores?.[0] ?? ""}
-              onChange={(e) => set("setores", [e.target.value])}
-              className="input-base"
-            >
-              {SETORES_ACESSO.map((s) => (
-                <option key={s.id} value={s.id}>{s.label}</option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {isDono(form.cargo ?? "") && (
-          <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5">
-            <p className="text-[11px] text-slate-500">
-              CEO / Dono tem acesso a <strong>todos os setores</strong> automaticamente.
-            </p>
-          </div>
-        )}
 
         {!isNovo && (
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
-              checked={form.status === "ativo"}
-              onChange={(e) => set("status", e.target.checked ? "ativo" : "inativo")}
+              checked={form.ativo ?? true}
+              onChange={(e) => set("ativo", e.target.checked)}
               className="accent-blue-500"
             />
             <span className="text-xs text-slate-700">Conta ativa</span>

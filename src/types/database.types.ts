@@ -21,12 +21,11 @@ export type Database = {
       profiles: {
         Row: {
           id: string;
-          nome: string;
-          cargo: string;
-          cpf: string | null;
-          email: string;
-          status: "ativo" | "inativo" | "pendente";
-          cor: string;
+          nome: string | null;
+          cargo: string | null;
+          cargo_id: string | null;
+          ativo: boolean;
+          avatar_url: string | null;
           setores: string[];
           workspace_id: string | null;
           created_at: string;
@@ -34,6 +33,31 @@ export type Database = {
         };
         Insert: Omit<Database["public"]["Tables"]["profiles"]["Row"], "created_at" | "updated_at">;
         Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>;
+      };
+      cargos: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          nome: string;
+          sistema: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["cargos"]["Row"], "id" | "created_at" | "updated_at">;
+        Update: Partial<Database["public"]["Tables"]["cargos"]["Insert"]>;
+      };
+      permissoes_cargo: {
+        Row: {
+          id: string;
+          cargo_id: string;
+          setor: "comercial" | "obras" | "financeiro" | "notificacoes" | "configuracoes";
+          pode_visualizar: boolean;
+          pode_criar: boolean;
+          pode_editar: boolean;
+          pode_excluir: boolean;
+        };
+        Insert: Omit<Database["public"]["Tables"]["permissoes_cargo"]["Row"], "id">;
+        Update: Partial<Database["public"]["Tables"]["permissoes_cargo"]["Insert"]>;
       };
       leads: {
         Row: {

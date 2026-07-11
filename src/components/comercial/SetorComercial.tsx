@@ -1,6 +1,7 @@
 "use client";
 import { useState, useMemo, useEffect } from "react";
 import { useLeads } from "@/hooks/useLeads";
+import { usePermissoes } from "@/hooks/usePermissoes";
 import { getCorrespondentes } from "@/services/correspondentes.service";
 import DashboardComercial from "./DashboardComercial";
 import Pipeline from "./Pipeline";
@@ -18,6 +19,7 @@ const ETAPAS_COM_FORM = new Set<EtapaLead>(["reuniao", "analise", "aprovada", "r
 
 export default function SetorComercial() {
   const { leads, loading, salvar, avancarEtapa, enviarParaObras } = useLeads();
+  const { pode } = usePermissoes();
   const [aba, setAba]       = useState<Aba>("dashboard");
   const [busca, setBusca]   = useState("");
   const [modalLead, setModalLead] = useState<Lead | "novo" | null>(null);
@@ -80,12 +82,14 @@ export default function SetorComercial() {
               className="border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 outline-none focus:border-blue-400 w-44"
             />
           )}
-          <button
-            onClick={() => setModalLead("novo")}
-            className="btn-primary text-xs px-3 py-1.5"
-          >
-            + Novo Lead
-          </button>
+          {pode("comercial", "criar") && (
+            <button
+              onClick={() => setModalLead("novo")}
+              className="btn-primary text-xs px-3 py-1.5"
+            >
+              + Novo Lead
+            </button>
+          )}
         </div>
       </div>
 
@@ -104,6 +108,7 @@ export default function SetorComercial() {
                 onEdit={setModalLead}
                 onAddLead={() => setModalLead("novo")}
                 onMoveEtapa={handleMoveEtapa}
+                podeCriar={pode("comercial", "criar")}
               />
             )}
             {aba === "propostas" && (

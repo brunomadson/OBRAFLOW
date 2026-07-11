@@ -3,6 +3,7 @@ import { useState } from "react";
 import Modal, { ModalHeader } from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
 import CurrencyInput from "@/components/ui/CurrencyInput";
+import { usePermissoes } from "@/hooks/usePermissoes";
 import { STATUS_MEDICAO_LABEL, STATUS_MEDICAO_COR } from "@/constants/dominios";
 import type { Medicao, StatusMedicao, MedicaoHistoricoEntry } from "@/types/app.types";
 import toast from "react-hot-toast";
@@ -28,6 +29,7 @@ interface Props {
 export default function ModalMedicao({ obraId, obraCliente, medicao, onClose, onSave, onDelete }: Props) {
   const isNew = !medicao?.id;
   const statusOriginal = medicao?.status ?? "a_solicitar";
+  const { pode } = usePermissoes();
 
   const [form, setForm] = useState<Partial<Medicao>>(
     medicao ?? { status: "a_solicitar", nome: "", pct_solicitada: undefined }
@@ -224,7 +226,7 @@ export default function ModalMedicao({ obraId, obraCliente, medicao, onClose, on
 
         {/* Ações */}
         <div className="flex justify-between gap-2 pt-2">
-          {!isNew && onDelete && (
+          {!isNew && onDelete && pode("obras", "excluir") && (
             <Button variant="danger" size="sm" onClick={handleDelete} loading={saving}>
               Excluir
             </Button>

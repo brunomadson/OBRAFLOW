@@ -1,16 +1,40 @@
 // ─── Domínio: Usuário / Perfil ────────────────────────────────────────────────
-export type UserStatus = "ativo" | "inativo" | "pendente";
-
 export interface Profile {
   id: string;
   nome: string;
   cargo: string;
-  cpf: string | null;
-  email: string;
-  status: UserStatus;
-  cor: string;
+  cargo_id: string | null;
+  ativo: boolean;
+  avatar_url: string | null;
   setores: string[];
   workspace_id?: string | null;
+}
+
+// ─── Domínio: RBAC (cargos e matriz de permissão) ─────────────────────────────
+export type SetorPermissao = "comercial" | "obras" | "financeiro" | "notificacoes" | "configuracoes";
+export type AcaoPermissao = "visualizar" | "criar" | "editar" | "excluir";
+
+export interface Cargo {
+  id: string;
+  workspace_id?: string | null;
+  nome: string;
+  sistema: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PermissaoCargo {
+  id: string;
+  cargo_id: string;
+  setor: SetorPermissao;
+  pode_visualizar: boolean;
+  pode_criar: boolean;
+  pode_editar: boolean;
+  pode_excluir: boolean;
+}
+
+export interface CargoComPermissoes extends Cargo {
+  permissoes: PermissaoCargo[];
 }
 
 // ─── Domínio: Etapas ──────────────────────────────────────────────────────────

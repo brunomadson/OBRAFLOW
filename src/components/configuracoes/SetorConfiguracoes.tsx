@@ -11,11 +11,14 @@ import { ICONE_INTEGRACAO } from "@/constants/integracoes";
 import CurrencyInput from "@/components/ui/CurrencyInput";
 import Modal, { ModalHeader } from "@/components/ui/Modal";
 import { getProfiles, upsertProfile } from "@/services/profiles.service";
+import { getCargosComPermissoes, criarCargo, excluirCargo, atualizarPermissao } from "@/services/cargos.service";
+import { registrarHistorico } from "@/services/historico.service";
+import { useAuth } from "@/contexts/AuthContext";
 import { createClient } from "@/lib/supabase/client";
-import type { Profile, ConfigPrazos, IndicadorMeta, IntegracaoComStatus } from "@/types/app.types";
+import type { Profile, ConfigPrazos, IndicadorMeta, IntegracaoComStatus, CargoComPermissoes, SetorPermissao } from "@/types/app.types";
 import toast from "react-hot-toast";
 
-type Aba = "prazos" | "metas" | "membros" | "integracoes";
+type Aba = "prazos" | "metas" | "membros" | "cargos" | "integracoes";
 
 /* ---- Aba Metas ---- */
 function AbaMetas() {
@@ -161,6 +164,7 @@ function AbaPrazos() {
 
 /* ---- Aba Membros ---- */
 function AbaMembros() {
+  const { profile } = useAuth();
   const [membros, setMembros]   = useState<Profile[]>([]);
   const [loading, setLoading]   = useState(true);
   const [modal, setModal]       = useState<Profile | "novo" | null>(null);
@@ -174,7 +178,23 @@ function AbaMembros() {
   useEffect(() => { load(); }, [load]);
 
   const handleSave = async (data: Partial<Profile>) => {
-    await upsertProfile(data as Parameters<typeof upsertProfile>[0]);
+    const antes = typeof modal === "object" ? modal : null;
+    const depois = await upsertProfile(data as Parameters<typeof upsertProfile>[0]);
+
+    if (antes && antes.cargo_id !== depois.cargo_id) {
+      await registrarHistorico({
+        tipo: "sistema",
+        acao: `Alterou o cargo de ${antes.nome ?? "um membro"} de "${antes.cargo}" para "${depois.cargo}"`,
+        usuario_id: profile?.id ?? null,
+        usuario_nome: profile?.nome ?? "Sistema",
+        lead_id: null,
+        obra_id: null,
+        setor: null,
+        etapa: null,
+        workspace_id: profile?.workspace_id ?? null,
+      });
+    }
+
     await load();
     setModal(null);
   };
@@ -202,10 +222,10 @@ function AbaMembros() {
                 </div>
                 <div>
                   <p className="text-[13px] font-semibold text-slate-900">{m.nome}</p>
-                  <p className="text-[11px] text-slate-400">{m.cargo} · {m.setores?.[0] ?? ""}</p>
+                  <p className="text-[11px] text-slate-400">{m.cargo}</p>
                 </div>
               </div>
-              <Badge color={m.status === "ativo" ? "#10B981" : "#94A3B8"}>{m.status === "ativo" ? "Ativo" : "Inativo"}</Badge>
+              <Badge color={m.ativo ? "#10B981" : "#94A3B8"}>{m.ativo ? "Ativo" : "Inativo"}</Badge>
             </div>
           ))}
         </div>
@@ -218,6 +238,164 @@ function AbaMembros() {
           onSave={handleSave}
         />
       )}
+    </div>
+  );
+}
+
+/* ---- Aba Cargos ---- */
+const SETORES_MATRIZ: { id: SetorPermissao; label: string }[] = [
+  { id: "comercial",     label: "Comercial" },
+  { id: "obras",         label: "Obras" },
+  { id: "financeiro",    label: "Financeiro" },
+  { id: "notificacoes",  label: "Alertas" },
+  { id: "configuracoes", label: "Configurações" },
+];
+const ACOES_MATRIZ: { campo: "pode_visualizar" | "pode_criar" | "pode_editar" | "pode_excluir"; label: string }[] = [
+  { campo: "pode_visualizar", label: "Ver" },
+  { campo: "pode_criar",      label: "Criar" },
+  { campo: "pode_editar",     label: "Editar" },
+  { campo: "pode_excluir",    label: "Excluir" },
+];
+
+function AbaCargos() {
+  const { profile } = useAuth();
+  const [cargos, setCargos] = useState<CargoComPermissoes[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [novoNome, setNovoNome] = useState("");
+  const [criando, setCriando] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try { setCargos(await getCargosComPermissoes()); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleToggle = async (
+    cargo: CargoComPermissoes,
+    setor: SetorPermissao,
+    campo: "pode_visualizar" | "pode_criar" | "pode_editar" | "pode_excluir",
+    valorAtual: boolean
+  ) => {
+    const permissao = cargo.permissoes.find((p) => p.setor === setor);
+    if (!permissao) return;
+
+    setCargos((prev) => prev.map((c) => c.id !== cargo.id ? c : {
+      ...c,
+      permissoes: c.permissoes.map((p) => p.id === permissao.id ? { ...p, [campo]: !valorAtual } : p),
+    }));
+
+    try {
+      await atualizarPermissao(permissao.id, campo, !valorAtual);
+      await registrarHistorico({
+        tipo: "sistema",
+        acao: `Alterou a permissão "${ACOES_MATRIZ.find((a) => a.campo === campo)?.label}" de ${SETORES_MATRIZ.find((s) => s.id === setor)?.label} no cargo "${cargo.nome}" para ${!valorAtual ? "permitido" : "bloqueado"}`,
+        usuario_id: profile?.id ?? null,
+        usuario_nome: profile?.nome ?? "Sistema",
+        lead_id: null,
+        obra_id: null,
+        setor: null,
+        etapa: null,
+        workspace_id: profile?.workspace_id ?? null,
+      });
+    } catch {
+      toast.error("Erro ao salvar permissão.");
+      await load();
+    }
+  };
+
+  const handleCriar = async () => {
+    if (!novoNome.trim()) { toast.error("Informe o nome do cargo"); return; }
+    if (!profile?.workspace_id) return;
+    setCriando(true);
+    try {
+      await criarCargo(novoNome.trim(), profile.workspace_id);
+      setNovoNome("");
+      toast.success("Cargo criado! Ajuste as permissões abaixo.");
+      await load();
+    } catch {
+      toast.error("Erro ao criar cargo.");
+    } finally {
+      setCriando(false);
+    }
+  };
+
+  const handleExcluir = async (cargo: CargoComPermissoes) => {
+    if (!confirm(`Excluir o cargo "${cargo.nome}"? Membros com esse cargo perderão o acesso até serem reatribuídos.`)) return;
+    try {
+      await excluirCargo(cargo.id);
+      await load();
+    } catch {
+      toast.error("Não foi possível excluir esse cargo.");
+    }
+  };
+
+  if (loading) return <p className="text-sm text-slate-400">Carregando...</p>;
+
+  return (
+    <div className="max-w-4xl">
+      <div className="flex justify-between items-end gap-3 mb-4">
+        <p className="text-[13px] font-bold text-slate-700">Cargos e Permissões ({cargos.length})</p>
+        <div className="flex gap-2">
+          <input
+            value={novoNome}
+            onChange={(e) => setNovoNome(e.target.value)}
+            placeholder="Nome do novo cargo"
+            className="input-base text-xs w-52"
+          />
+          <Button variant="primary" size="sm" onClick={handleCriar} loading={criando}>+ Novo Cargo</Button>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        {cargos.map((cargo) => (
+          <div key={cargo.id} className="card p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <p className="text-[13px] font-bold text-slate-900">{cargo.nome}</p>
+                {cargo.sistema && <Badge color="#94A3B8">Padrão do sistema</Badge>}
+              </div>
+              {!cargo.sistema && (
+                <button onClick={() => handleExcluir(cargo)} className="text-[11px] text-red-500 hover:text-red-600">
+                  Excluir cargo
+                </button>
+              )}
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-[11px]">
+                <thead>
+                  <tr className="text-slate-400 text-left">
+                    <th className="font-medium pb-1.5 pr-3">Setor</th>
+                    {ACOES_MATRIZ.map((a) => <th key={a.campo} className="font-medium pb-1.5 px-2 text-center">{a.label}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {SETORES_MATRIZ.map((setor) => {
+                    const permissao = cargo.permissoes.find((p) => p.setor === setor.id);
+                    return (
+                      <tr key={setor.id} className="border-t border-slate-100">
+                        <td className="py-1.5 pr-3 text-slate-600">{setor.label}</td>
+                        {ACOES_MATRIZ.map((a) => (
+                          <td key={a.campo} className="py-1.5 px-2 text-center">
+                            <input
+                              type="checkbox"
+                              className="accent-blue-500"
+                              checked={permissao?.[a.campo] ?? false}
+                              onChange={() => permissao && handleToggle(cargo, setor.id, a.campo, permissao[a.campo])}
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -304,7 +482,7 @@ function AbaIntegracoes() {
 /* ---- Main ---- */
 export default function SetorConfiguracoes() {
   const [aba, setAba] = useState<Aba>("prazos");
-  const tabs: [Aba, string][] = [["prazos", "Prazos"], ["metas", "Metas"], ["membros", "Membros"], ["integracoes", "Integrações"]];
+  const tabs: [Aba, string][] = [["prazos", "Prazos"], ["metas", "Metas"], ["membros", "Membros"], ["cargos", "Cargos"], ["integracoes", "Integrações"]];
 
   return (
     <div>
@@ -317,6 +495,7 @@ export default function SetorConfiguracoes() {
         {aba === "prazos"      && <AbaPrazos />}
         {aba === "metas"       && <AbaMetas />}
         {aba === "membros"     && <AbaMembros />}
+        {aba === "cargos"      && <AbaCargos />}
         {aba === "integracoes" && <AbaIntegracoes />}
       </div>
     </div>

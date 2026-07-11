@@ -76,9 +76,9 @@ export default function Sidebar({ notifCount }: Props) {
           <div
             className="w-8 h-8 rounded-full flex items-center justify-center text-[13px] font-extrabold flex-shrink-0 border-[1.5px]"
             style={{
-              background: (profile?.cor ?? "#3B82F6") + "33",
-              borderColor: profile?.cor ?? "#3B82F6",
-              color: profile?.cor ?? "#3B82F6",
+              background: "#3B82F633",
+              borderColor: "#3B82F6",
+              color: "#3B82F6",
             }}
           >
             {profile?.nome?.charAt(0) ?? "?"}

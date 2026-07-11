@@ -9,6 +9,7 @@
     "lint": "next lint",
     "type-check": "tsc --noEmit",
     "security-test": "node --env-file=.env.local security-test.mjs",
+    "rbac-test": "node --env-file=.env.local rbac-test.mjs",
     "prepare": "husky"
   },
   "dependencies": {

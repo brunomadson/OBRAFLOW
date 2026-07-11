@@ -72,12 +72,13 @@ const CardKanban = memo(function CardKanban({ lead, etapaCor, onClick }: CardPro
   );
 });
 
-function ColunaEtapa({ etapa, cards, total, onAddLead, onEdit }: {
+function ColunaEtapa({ etapa, cards, total, onAddLead, onEdit, podeCriar }: {
   etapa: (typeof ETAPAS_LEAD)[number];
   cards: Lead[];
   total: number;
   onAddLead: () => void;
   onEdit: (lead: Lead) => void;
+  podeCriar: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: etapa.id });
 
@@ -105,7 +106,7 @@ function ColunaEtapa({ etapa, cards, total, onAddLead, onEdit }: {
         ))}
       </div>
 
-      {etapa.id === "leads" && (
+      {etapa.id === "leads" && podeCriar && (
         <button
           onClick={onAddLead}
           className="w-full border-[1.5px] border-dashed border-slate-300 bg-transparent rounded-xl py-2.5 text-xs text-slate-400 cursor-pointer mt-1 font-semibold hover:border-slate-400 transition-colors"
@@ -122,9 +123,10 @@ interface Props {
   onEdit: (lead: Lead) => void;
   onAddLead: () => void;
   onMoveEtapa: (leadId: string, novaEtapa: EtapaLead) => void | Promise<void>;
+  podeCriar?: boolean;
 }
 
-export default function Pipeline({ leads, onEdit, onAddLead, onMoveEtapa }: Props) {
+export default function Pipeline({ leads, onEdit, onAddLead, onMoveEtapa, podeCriar = true }: Props) {
   const [activeLead, setActiveLead] = useState<Lead | null>(null);
 
   const sensors = useSensors(
@@ -162,6 +164,7 @@ export default function Pipeline({ leads, onEdit, onAddLead, onMoveEtapa }: Prop
               total={total}
               onAddLead={onAddLead}
               onEdit={onEdit}
+              podeCriar={podeCriar}
             />
           );
         })}

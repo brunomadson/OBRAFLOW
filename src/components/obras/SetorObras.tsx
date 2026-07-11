@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useObras } from "@/hooks/useObras";
+import { usePermissoes } from "@/hooks/usePermissoes";
 import DashboardObras from "./DashboardObras";
 import AbaObras from "./AbaObras";
 import AbaMedicoes from "./AbaMedicoes";
@@ -12,6 +13,7 @@ type Aba = "dashboard" | "obras" | "medicoes";
 
 export default function SetorObras() {
   const { obras, loading, salvar, avancarEtapa, salvarMedicao, removerMedicao } = useObras();
+  const { pode } = usePermissoes();
   const [aba, setAba]     = useState<Aba>("dashboard");
   const [busca, setBusca] = useState("");
 
@@ -48,9 +50,11 @@ export default function SetorObras() {
               className="border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 outline-none focus:border-blue-400 w-44"
             />
           )}
-          <button onClick={() => setModalObraId("nova")} className="btn-primary text-xs px-3 py-1.5">
-            + Nova Obra
-          </button>
+          {pode("obras", "criar") && (
+            <button onClick={() => setModalObraId("nova")} className="btn-primary text-xs px-3 py-1.5">
+              + Nova Obra
+            </button>
+          )}
         </div>
       </div>
 

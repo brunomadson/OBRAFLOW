@@ -30,12 +30,25 @@ export async function createWorkspaceAndLink(data: {
 
   if (wErr) throw wErr;
 
+  // O INSERT acima dispara o trigger workspaces_seed_cargos, que já criou os
+  // 6 cargos padrão (inclusive "CEO / Dono") pra este workspace. cargo/setores
+  // do profile são recalculados automaticamente pelo trigger de sync a partir
+  // do cargo_id — não precisa (nem deve) escrever esses dois campos direto.
+  const { data: cargoCeo, error: cErr } = await supabase
+    .from("cargos")
+    .select("id")
+    .eq("workspace_id", workspaceId)
+    .eq("nome", "CEO / Dono")
+    .maybeSingle<{ id: string }>();
+
+  if (cErr) throw cErr;
+  if (!cargoCeo) throw new Error("Cargo CEO / Dono não foi criado para o novo workspace");
+
   const { error: pErr } = await supabase
     .from("profiles")
     .update({
       workspace_id: workspaceId,
-      cargo: "CEO / Dono",
-      setores: ["comercial", "obras", "financeiro", "configuracoes"],
+      cargo_id: cargoCeo.id,
     } as never)
     .eq("id", user.id);
 

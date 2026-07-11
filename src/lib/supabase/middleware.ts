@@ -46,7 +46,8 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/auth/callback") ||
     pathname.startsWith("/aceitar-convite") ||
     pathname.startsWith("/cadastro") ||
-    pathname.startsWith("/onboarding");
+    pathname.startsWith("/onboarding") ||
+    pathname.startsWith("/reset-password");
 
   if (!user && !isAuthPage && !isPublicPage) {
     const url = request.nextUrl.clone();

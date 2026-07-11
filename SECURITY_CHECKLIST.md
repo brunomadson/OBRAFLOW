@@ -9,7 +9,7 @@ verdade de segurança do projeto, não um documento de uma vez só.
 - [x] JWT validado — todo `auth.uid()` usado em RLS vem de um JWT emitido pelo Supabase Auth
 - [x] Login (e-mail/senha) funcional
 - [x] Convite de membro funcional (magic link + trigger aplica cargo/setores)
-- [ ] Recuperação de senha testada ponta a ponta (rota existe, fluxo completo de e-mail não foi testado nesta sessão)
+- [x] Recuperação de senha testada ponta a ponta — achado e corrigido bug real: `/reset-password` não estava na lista de rotas públicas do `middleware.ts`, então o middleware redirecionava pro `/login` no servidor antes do token de recuperação (que vem depois do `#`, nunca chega ao servidor) ser processado pelo navegador. Ninguém conseguia usar o link de recuperação. Testado com link real gerado via API do Supabase (2026-07-11)
 
 ## Banco
 

@@ -248,7 +248,10 @@ const SETORES_MATRIZ: { id: SetorPermissao; label: string }[] = [
   { id: "obras",         label: "Obras" },
   { id: "financeiro",    label: "Financeiro" },
   { id: "notificacoes",  label: "Alertas" },
-  { id: "configuracoes", label: "Configurações" },
+  { id: "configuracoes", label: "Configurações (Prazos)" },
+  { id: "metas",         label: "Metas" },
+  { id: "membros",       label: "Membros" },
+  { id: "integracoes",   label: "Integrações" },
 ];
 const ACOES_MATRIZ: { campo: "pode_visualizar" | "pode_criar" | "pode_editar" | "pode_excluir"; label: string }[] = [
   { campo: "pode_visualizar", label: "Ver" },

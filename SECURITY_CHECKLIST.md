@@ -45,3 +45,9 @@ verdade de segurança do projeto, não um documento de uma vez só.
 - [x] Variáveis de ambiente confirmadas na Vercel (Production) — `NEXT_PUBLIC_SUPABASE_ANON_KEY` atualizada pro novo formato, redeploy confirmado funcionando
 - [x] Variáveis antigas removidas da Vercel — `SUPABASE_SERVICE_ROLE_KEY` (não usada no client, só scripts locais) deletada
 - [x] `.env.local` confirmado fora do git (`git ls-files | grep .env` vazio — já confirmado nesta sessão)
+
+## Infraestrutura e operação (Sprint 8)
+
+- [ ] **Ambiente DEV separado de produção** — documentado e pronto em `AMBIENTES.md` (passo a passo completo, código já compatível), mas a criação do projeto Supabase novo é trabalho manual ainda não feito. Hoje dev local e produção compartilham o mesmo banco
+- [x] Monitoramento de erros — código pronto (`@sentry/nextjs` instalado, `instrumentation.ts`/`instrumentation-client.ts`/`global-error.tsx`, identificação de workspace/usuário já cabeada em `AuthContext`), deliberadamente **inativo** até criar conta (ver `MONITORAMENTO.md`) — decisão consciente, sistema ainda pequeno
+- [ ] **Backup automático — não existe.** Plano Supabase atual é Free, sem PITR nem snapshot diário (confirmado no Dashboard, 2026-07-13). Mitigação gratuita criada: `npm run backup` (`backup-manual.mjs`) exporta todas as tabelas pra JSON local — não cobre arquivos do Storage, não é transacional, não é automático. Ver `BACKUP_RECOVERY.md` para o plano de migrar pro Supabase Pro (US$25/mês, backup diário + PITR opcional) — risco real existente hoje com dado de cliente real (Concretize) no banco, não é item cosmético

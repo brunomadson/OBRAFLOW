@@ -1,5 +1,6 @@
 "use client";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import * as Sentry from "@sentry/nextjs";
 import { createClient } from "@/lib/supabase/client";
 import { getProfile } from "@/services/profiles.service";
 import type { Profile } from "@/types/app.types";
@@ -56,6 +57,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     return () => subscription.unsubscribe();
   }, [supabase]);
+
+  // Identifica quem está logado nos eventos do Sentry — sem isso, um erro
+  // reportado não diz de qual empresa/usuário veio, inviável pra suporte.
+  // Sentry.setUser/setContext são no-op se o SDK estiver desativado
+  // (sem SENTRY_DSN configurado), então isso não tem custo nenhum hoje.
+  useEffect(() => {
+    if (user && profile) {
+      Sentry.setUser({ id: user.id, email: user.email });
+      Sentry.setContext("workspace", { id: profile.workspace_id ?? null, cargo: profile.cargo });
+    } else {
+      Sentry.setUser(null);
+    }
+  }, [user, profile]);
 
   const signOut = async () => {
     await supabase.auth.signOut();

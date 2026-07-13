@@ -37,3 +37,6 @@ Thumbs.db
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Backups manuais (backup-manual.mjs) — contém dado real de cliente, nunca commitar
+/backups/

@@ -10,10 +10,12 @@
     "type-check": "tsc --noEmit",
     "security-test": "node --env-file=.env.local security-test.mjs",
     "rbac-test": "node --env-file=.env.local rbac-test.mjs",
+    "backup": "node --env-file=.env.local backup-manual.mjs",
     "prepare": "husky"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
+    "@sentry/nextjs": "^10.65.0",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.47.10",
     "clsx": "^2.1.1",

@@ -50,7 +50,7 @@ export type Database = {
         Row: {
           id: string;
           cargo_id: string;
-          setor: "comercial" | "obras" | "financeiro" | "notificacoes" | "configuracoes" | "metas" | "membros" | "integracoes";
+          setor: "comercial" | "obras" | "financeiro" | "notificacoes" | "configuracoes" | "metas" | "membros" | "integracoes" | "documentos";
           pode_visualizar: boolean;
           pode_criar: boolean;
           pode_editar: boolean;

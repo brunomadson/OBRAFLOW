@@ -55,7 +55,10 @@ export async function uploadDocumento(params: {
   // 1. Envia para o storage
   await storage.upload({ file, path: storagePath });
 
-  // 2. Salva registro no banco
+  // 2. Salva registro no banco (usuario_id identifica quem anexou — a RLS
+  // usa isso pra decidir quem pode editar/reenviar este documento depois)
+  const { data: { user } } = await supabase.auth.getUser();
+
   const { data, error } = await supabase
     .from("documentos")
     .insert({
@@ -67,6 +70,7 @@ export async function uploadDocumento(params: {
       tamanho_bytes: file.size,
       mime_type: file.type || null,
       storage_path: storagePath,
+      usuario_id: user?.id ?? null,
     } as never)
     .select()
     .single();

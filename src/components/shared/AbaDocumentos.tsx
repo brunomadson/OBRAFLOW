@@ -8,6 +8,7 @@ import {
 } from "@/services/documentos.service";
 import { registrarHistorico } from "@/services/historico.service";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermissoes } from "@/hooks/usePermissoes";
 import type { Documento, EtapaObra } from "@/types/app.types";
 import toast from "react-hot-toast";
 
@@ -224,6 +225,7 @@ function FileRow({
   label?: string;
   onDelete: (doc: Documento) => Promise<void>;
 }) {
+  const { pode } = usePermissoes();
   const [busy, setBusy] = useState(false);
 
   const handleDownload = async () => {
@@ -256,10 +258,12 @@ function FileRow({
         title="Baixar" className="text-blue-400 hover:text-blue-600 p-1 disabled:opacity-40 flex-shrink-0">
         <IconDownload />
       </button>
-      <button onClick={handleDel} disabled={busy}
-        title="Remover" className="text-slate-300 hover:text-red-400 p-1 disabled:opacity-40 flex-shrink-0">
-        <IconTrash />
-      </button>
+      {pode("documentos", "excluir") && (
+        <button onClick={handleDel} disabled={busy}
+          title="Remover" className="text-slate-300 hover:text-red-400 p-1 disabled:opacity-40 flex-shrink-0">
+          <IconTrash />
+        </button>
+      )}
     </div>
   );
 }
@@ -278,13 +282,15 @@ function DocTypeRow({
   onDeleted: (id: string) => void;
 }) {
   const { profile } = useAuth();
+  const { pode } = usePermissoes();
   const nomeUsuario = profile?.nome ?? "Sistema";
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
+  const podeCriar = pode("documentos", "criar") && pode(leadId ? "comercial" : "obras", "criar");
   const typeDocs = docs.filter((d) => d.tipo_doc === tipo.id);
   const hasDoc = typeDocs.length > 0;
-  const canUpload = tipo.multiple || !hasDoc;
+  const canUpload = (tipo.multiple || !hasDoc) && podeCriar;
 
   const handleUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;

@@ -33,7 +33,7 @@ export async function criarCargo(nome: string, workspaceId: string): Promise<Car
     .single();
   if (error) throw error;
 
-  const setores: SetorPermissao[] = ["comercial", "obras", "financeiro", "notificacoes", "configuracoes", "metas", "membros", "integracoes"];
+  const setores: SetorPermissao[] = ["comercial", "obras", "financeiro", "notificacoes", "configuracoes", "metas", "membros", "integracoes", "documentos"];
   const { error: pErr } = await supabase.from("permissoes_cargo").insert(
     setores.map((setor) => ({
       cargo_id: (data as Cargo).id,

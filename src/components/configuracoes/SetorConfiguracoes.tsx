@@ -252,6 +252,7 @@ const SETORES_MATRIZ: { id: SetorPermissao; label: string }[] = [
   { id: "metas",         label: "Metas" },
   { id: "membros",       label: "Membros" },
   { id: "integracoes",   label: "Integrações" },
+  { id: "documentos",    label: "Documentos" },
 ];
 const ACOES_MATRIZ: { campo: "pode_visualizar" | "pode_criar" | "pode_editar" | "pode_excluir"; label: string }[] = [
   { campo: "pode_visualizar", label: "Ver" },

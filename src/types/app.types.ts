@@ -13,7 +13,7 @@ export interface Profile {
 // ─── Domínio: RBAC (cargos e matriz de permissão) ─────────────────────────────
 export type SetorPermissao =
   | "comercial" | "obras" | "financeiro" | "notificacoes" | "configuracoes"
-  | "metas" | "membros" | "integracoes";
+  | "metas" | "membros" | "integracoes" | "documentos";
 export type AcaoPermissao = "visualizar" | "criar" | "editar" | "excluir";
 
 export interface Cargo {

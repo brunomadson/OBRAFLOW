@@ -2,6 +2,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { processarSessaoDoHash } from "@/lib/supabase/processarSessaoDoHash";
 
 // Recebe o retorno de e-mails de confirmação (cadastro) e convite de
 // membro. Precisa ser uma página client, não uma rota de servidor: os
@@ -27,9 +28,17 @@ function AuthCallbackContent() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) setPronto(true);
     });
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setPronto(true);
+
+    // Processa manualmente o token do "#" antes de esperar passivamente —
+    // ver processarSessaoDoHash.ts pro motivo de não confiar só na
+    // detecção automática do SDK.
+    processarSessaoDoHash().then((processou) => {
+      if (processou) { setPronto(true); return; }
+      supabase.auth.getSession().then(({ data }) => {
+        if (data.session) setPronto(true);
+      });
     });
+
     return () => subscription.unsubscribe();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

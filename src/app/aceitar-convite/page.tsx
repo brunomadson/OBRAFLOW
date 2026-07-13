@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { processarSessaoDoHash } from "@/lib/supabase/processarSessaoDoHash";
 import { getSetorInicial } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
@@ -14,20 +15,26 @@ export default function AceitarConvitePage() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    // Supabase processa os tokens do magic link na URL automaticamente.
-    // Ouvimos o evento SIGNED_IN para saber quando a sessão está pronta.
+    // Ouvimos o evento SIGNED_IN pra saber quando a sessão está pronta.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) {
         setPronto(true);
       }
     });
 
-    // Também verifica sessão existente (caso o usuário já estivesse logado)
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setPronto(true);
+    // Processa manualmente o token do "#" da URL do e-mail de convite —
+    // ver processarSessaoDoHash.ts pro motivo de não confiar só na
+    // detecção automática do SDK.
+    processarSessaoDoHash().then((processou) => {
+      if (processou) { setPronto(true); return; }
+      // Sessão já existente (usuário já estava logado)?
+      supabase.auth.getSession().then(({ data }) => {
+        if (data.session) setPronto(true);
+      });
     });
 
     return () => subscription.unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Sem sessão após 5 segundos → redireciona para login

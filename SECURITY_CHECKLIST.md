@@ -8,8 +8,8 @@ verdade de segurança do projeto, não um documento de uma vez só.
 
 - [x] JWT validado — todo `auth.uid()` usado em RLS vem de um JWT emitido pelo Supabase Auth
 - [x] Login (e-mail/senha) funcional
-- [x] Convite de membro funcional (magic link + trigger aplica cargo/setores)
 - [x] Recuperação de senha testada ponta a ponta — achado e corrigido bug real: `/reset-password` não estava na lista de rotas públicas do `middleware.ts`, então o middleware redirecionava pro `/login` no servidor antes do token de recuperação (que vem depois do `#`, nunca chega ao servidor) ser processado pelo navegador. Ninguém conseguia usar o link de recuperação. Testado com link real gerado via API do Supabase (2026-07-11)
+- [x] **Vulnerabilidade funcional real corrigida (2026-07-14, achada pelo usuário testando um convite de verdade)**: `/auth/callback` era uma rota de servidor que só sabia processar o formato `?code=` — mas os dois fluxos reais que passam por ali (confirmação de e-mail do cadastro, `next=/onboarding`, e convite de membro, `next=/aceitar-convite`) sempre geram link no formato `#access_token=` (depois do `#`, nunca chega ao servidor). Todo clique nesses links caía no fallback e mandava a pessoa pro `/login` sem nenhuma explicação — confirmado com print real de usuário e reproduzido via link gerado pela API do Supabase. Reescrito como página client (mesmo padrão comprovado de `/reset-password`/`/aceitar-convite`), que deixa o próprio navegador processar o token. Isso quer dizer que **nenhum convite de membro e nenhuma confirmação de cadastro por e-mail funcionavam antes desta correção** — item anterior ("Convite de membro funcional") estava incorreto, nunca tinha sido testado com um clique real
 
 ## Banco
 

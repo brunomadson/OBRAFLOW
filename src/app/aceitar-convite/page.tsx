@@ -53,11 +53,14 @@ export default function AceitarConvitePage() {
     const { data: { user } } = await supabase.auth.getUser();
     let destino = "/comercial";
     if (user) {
-      const { data: profile } = await supabase
+      const { data: profile, error: profileErr } = await supabase
         .from("profiles")
         .select("cargo, setores")
         .eq("id", user.id)
         .single<{ cargo: string; setores: string[] }>();
+      if (profileErr) {
+        console.error("Erro ao carregar perfil após aceitar convite:", profileErr.message);
+      }
       destino = `/${getSetorInicial(profile)}`;
     }
 

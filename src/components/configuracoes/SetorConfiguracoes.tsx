@@ -14,6 +14,7 @@ import { getProfiles, upsertProfile } from "@/services/profiles.service";
 import { getCargosComPermissoes, criarCargo, excluirCargo, atualizarPermissao } from "@/services/cargos.service";
 import { registrarHistorico } from "@/services/historico.service";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermissoes } from "@/hooks/usePermissoes";
 import { createClient } from "@/lib/supabase/client";
 import type { Profile, ConfigPrazos, IndicadorMeta, IntegracaoComStatus, CargoComPermissoes, SetorPermissao } from "@/types/app.types";
 import toast from "react-hot-toast";
@@ -165,6 +166,7 @@ function AbaPrazos() {
 /* ---- Aba Membros ---- */
 function AbaMembros() {
   const { profile } = useAuth();
+  const { pode } = usePermissoes();
   const [membros, setMembros]   = useState<Profile[]>([]);
   const [loading, setLoading]   = useState(true);
   const [modal, setModal]       = useState<Profile | "novo" | null>(null);
@@ -203,7 +205,9 @@ function AbaMembros() {
     <div className="max-w-2xl">
       <div className="flex justify-between items-center mb-4">
         <p className="text-[13px] font-bold text-slate-700">Equipe ({membros.length})</p>
-        <Button variant="primary" size="sm" onClick={() => setModal("novo")}>+ Convidar Membro</Button>
+        {pode("membros", "criar") && (
+          <Button variant="primary" size="sm" onClick={() => setModal("novo")}>+ Convidar Membro</Button>
+        )}
       </div>
 
       {loading ? (
@@ -263,6 +267,7 @@ const ACOES_MATRIZ: { campo: "pode_visualizar" | "pode_criar" | "pode_editar" | 
 
 function AbaCargos() {
   const { profile } = useAuth();
+  const { pode } = usePermissoes();
   const [cargos, setCargos] = useState<CargoComPermissoes[]>([]);
   const [loading, setLoading] = useState(true);
   const [novoNome, setNovoNome] = useState("");
@@ -341,15 +346,17 @@ function AbaCargos() {
     <div className="max-w-4xl">
       <div className="flex justify-between items-end gap-3 mb-4">
         <p className="text-[13px] font-bold text-slate-700">Cargos e Permissões ({cargos.length})</p>
-        <div className="flex gap-2">
-          <input
-            value={novoNome}
-            onChange={(e) => setNovoNome(e.target.value)}
-            placeholder="Nome do novo cargo"
-            className="input-base text-xs w-52"
-          />
-          <Button variant="primary" size="sm" onClick={handleCriar} loading={criando}>+ Novo Cargo</Button>
-        </div>
+        {pode("configuracoes", "criar") && (
+          <div className="flex gap-2">
+            <input
+              value={novoNome}
+              onChange={(e) => setNovoNome(e.target.value)}
+              placeholder="Nome do novo cargo"
+              className="input-base text-xs w-52"
+            />
+            <Button variant="primary" size="sm" onClick={handleCriar} loading={criando}>+ Novo Cargo</Button>
+          </div>
+        )}
       </div>
 
       <div className="space-y-4">
@@ -360,7 +367,7 @@ function AbaCargos() {
                 <p className="text-[13px] font-bold text-slate-900">{cargo.nome}</p>
                 {cargo.sistema && <Badge color="#94A3B8">Padrão do sistema</Badge>}
               </div>
-              {!cargo.sistema && (
+              {!cargo.sistema && pode("configuracoes", "excluir") && (
                 <button onClick={() => handleExcluir(cargo)} className="text-[11px] text-red-500 hover:text-red-600">
                   Excluir cargo
                 </button>
@@ -385,8 +392,9 @@ function AbaCargos() {
                           <td key={a.campo} className="py-1.5 px-2 text-center">
                             <input
                               type="checkbox"
-                              className="accent-blue-500"
+                              className="accent-blue-500 disabled:opacity-40 disabled:cursor-not-allowed"
                               checked={permissao?.[a.campo] ?? false}
+                              disabled={!pode("configuracoes", "editar")}
                               onChange={() => permissao && handleToggle(cargo, setor.id, a.campo, permissao[a.campo])}
                             />
                           </td>
@@ -406,6 +414,7 @@ function AbaCargos() {
 
 /* ---- Aba Integrações ---- */
 function AbaIntegracoes() {
+  const { pode } = usePermissoes();
   const [integracoes, setIntegracoes] = useState<IntegracaoComStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [conectando, setConectando] = useState<string | null>(null);
@@ -457,9 +466,13 @@ function AbaIntegracoes() {
                 {!i.disponivelNoPlano ? (
                   <Button variant="secondary" size="sm" onClick={() => setModal("upgrade")}>Upgrade</Button>
                 ) : i.status === "conectado" ? (
-                  <Button variant="secondary" size="sm" onClick={() => setModal("configurar")}>Configurar</Button>
+                  pode("integracoes", "editar") && (
+                    <Button variant="secondary" size="sm" onClick={() => setModal("configurar")}>Configurar</Button>
+                  )
                 ) : (
-                  <Button variant="primary" size="sm" loading={conectando === i.id} onClick={() => handleConectar(i)}>Conectar</Button>
+                  pode("integracoes", "criar") && (
+                    <Button variant="primary" size="sm" loading={conectando === i.id} onClick={() => handleConectar(i)}>Conectar</Button>
+                  )
                 )}
               </div>
             </div>

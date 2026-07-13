@@ -33,11 +33,19 @@ export default function LoginForm() {
 
     let destino = "/comercial";
     if (data.user) {
-      const { data: profile } = await supabase
+      const { data: profile, error: profileErr } = await supabase
         .from("profiles")
         .select("cargo, setores, workspace_id")
         .eq("id", data.user.id)
         .single<{ cargo: string; setores: string[]; workspace_id: string | null }>();
+
+      if (profileErr) {
+        // Não manda pro onboarding às cegas num erro transitório — isso
+        // poderia levar a criar um workspace duplicado sem perceber.
+        toast.error("Login feito, mas não consegui carregar seu perfil. Recarregue a página.");
+        setLoading(false);
+        return;
+      }
       destino = profile?.workspace_id ? `/${getSetorInicial(profile)}` : "/onboarding";
     }
 

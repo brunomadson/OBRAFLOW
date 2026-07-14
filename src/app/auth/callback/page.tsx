@@ -22,12 +22,24 @@ export const dynamic = "force-dynamic";
 // Achado em produção (2ª correção): mesmo virando página client, não dava
 // pra confiar que o SDK processa o "#access_token=" sozinho — processamos
 // manualmente agora (ver processarSessaoDoHash.ts).
+// DIAGNÓSTICO TEMPORÁRIO (remover depois de achar a causa raiz):
+// captura o hash bruto da URL ANTES de qualquer processamento apagá-lo,
+// pra mostrar na tela se ele realmente chegou até aqui ou não.
+function capturarHashBruto() {
+  if (typeof window === "undefined") return "(sem window)";
+  const h = window.location.hash;
+  if (!h) return "(vazio)";
+  return `presente, ${h.length} chars, começa com "${h.slice(0, 20)}..."`;
+}
+
 function AuthCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
   const [pronto, setPronto] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [hashBruto] = useState(capturarHashBruto);
+  const [status, setStatus] = useState("iniciando...");
   const next = searchParams.get("next") ?? "/comercial";
 
   useEffect(() => {
@@ -35,10 +47,13 @@ function AuthCallbackContent() {
       if (session) setPronto(true);
     });
 
+    setStatus("chamando processarSessaoDoHash...");
     processarSessaoDoHash()
       .then((processou) => {
+        setStatus(`processarSessaoDoHash retornou: ${processou}`);
         if (processou) { setPronto(true); return; }
         return supabase.auth.getSession().then(({ data }) => {
+          setStatus(`getSession() fallback: sessão ${data.session ? "encontrada" : "ausente"}`);
           if (data.session) setPronto(true);
         });
       })
@@ -52,19 +67,24 @@ function AuthCallbackContent() {
     if (pronto) router.replace(next);
   }, [pronto, next, router]);
 
-  // Sem sessão após alguns segundos → link inválido/expirado, volta pro login
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!pronto) router.replace("/login");
-    }, 6000);
-    return () => clearTimeout(timer);
-  }, [pronto, router]);
-
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center gap-3 px-4">
       <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
       {erro && (
         <p className="text-red-400 text-xs text-center max-w-sm">Erro ao processar o link: {erro}</p>
+      )}
+      <div className="text-slate-500 text-[10px] text-center max-w-sm mt-4 space-y-1 font-mono">
+        <p>hash na URL: {hashBruto}</p>
+        <p>status: {status}</p>
+        <p>pronto: {String(pronto)}</p>
+      </div>
+      {!pronto && (
+        <button
+          onClick={() => router.replace("/login")}
+          className="mt-4 text-xs text-slate-400 underline"
+        >
+          Ir para login manualmente
+        </button>
       )}
     </div>
   );

@@ -12,6 +12,17 @@ function labelEtapaObra(etapa: string) {
   return ETAPAS_OBRA.find((e) => e.id === etapa)?.label ?? etapa;
 }
 
+// Fire-and-forget, mesmo padrão de dispararEventoPasta em useLeads.ts —
+// nunca deve travar nem falhar visivelmente o avanço de etapa por causa
+// de uma pasta de Drive.
+function dispararMovimentoPastaObra(obraId: string, etapaAnterior: string, novaEtapa: string) {
+  fetch(`/api/storage/obras/${obraId}/folder-event`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ etapaAnterior, novaEtapa }),
+  }).catch(() => {});
+}
+
 export function useObras() {
   const { profile } = useAuth();
   const nomeUsuario = profile?.nome ?? "Sistema";
@@ -70,6 +81,7 @@ export function useObras() {
         tipo: "obras", acao: acaoText,
         usuario_nome: nomeUsuario, usuario_id: null, setor: "obras", etapa: novaEtapa,
       }).catch(() => {});
+      dispararMovimentoPastaObra(obra.id, etapaAnterior, novaEtapa);
       toast.success(`Obra avançada para ${novaEtapa}`);
     } catch {
       toast.error("Erro ao avançar etapa");

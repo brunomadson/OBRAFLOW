@@ -416,7 +416,8 @@ export type CodigoIntegracao =
   | "open_finance"
   | "importacao_externa";
 
-export type StatusIntegracao = "nao_conectado" | "conectado";
+export type StatusIntegracao = "nao_conectado" | "conectado" | "erro";
+export type TipoAcessoIntegracao = "essential" | "premium";
 
 export interface Plano {
   id: string;
@@ -430,10 +431,15 @@ export interface Integracao {
   nome: string;
   descricao: string | null;
   ativo: boolean;
+  provider: string | null;
+  categoria: string | null;
+  tipo_acesso: TipoAcessoIntegracao;
 }
 
 // Visão já resolvida: integração + se o plano do workspace libera + estado de conexão.
 export interface IntegracaoComStatus extends Integracao {
   disponivelNoPlano: boolean;
   status: StatusIntegracao;
+  temProvider: boolean; // tem implementação real registrada (Sprint 11.1)? se não, botão "Conectar" fica desabilitado.
+  lastSync: string | null;
 }

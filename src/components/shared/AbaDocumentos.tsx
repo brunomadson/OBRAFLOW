@@ -231,7 +231,7 @@ function FileRow({
   const handleDownload = async () => {
     setBusy(true);
     try {
-      const url = await getDocumentoUrl(doc.storage_path);
+      const url = await getDocumentoUrl(doc.id);
       window.open(url, "_blank");
     } catch {
       toast.error("Erro ao baixar arquivo");

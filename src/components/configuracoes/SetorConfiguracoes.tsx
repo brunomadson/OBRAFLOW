@@ -6,8 +6,8 @@ import Badge from "@/components/ui/Badge";
 import { GRUPOS_CONFIG, CONFIG_PADRAO, GRUPOS_METAS } from "@/constants/config";
 import { getConfig, saveConfig } from "@/services/config.service";
 import { getMetas, upsertMeta, periodoAtual } from "@/services/metas.service";
-import { getIntegracoes, conectarIntegracao } from "@/services/integracoes.service";
-import { ICONE_INTEGRACAO } from "@/constants/integracoes";
+import { getIntegracoes, urlConectarIntegracao, desconectarIntegracao, testarConexaoIntegracao } from "@/services/integracoes.service";
+import { ICONE_INTEGRACAO, CATEGORIA_LABEL } from "@/constants/integracoes";
 import CurrencyInput from "@/components/ui/CurrencyInput";
 import Modal, { ModalHeader } from "@/components/ui/Modal";
 import { getProfiles, upsertProfile } from "@/services/profiles.service";
@@ -417,77 +417,163 @@ function AbaIntegracoes() {
   const { pode } = usePermissoes();
   const [integracoes, setIntegracoes] = useState<IntegracaoComStatus[]>([]);
   const [loading, setLoading] = useState(true);
-  const [conectando, setConectando] = useState<string | null>(null);
-  const [modal, setModal] = useState<"configurar" | "upgrade" | null>(null);
+  const [emAcao, setEmAcao] = useState<string | null>(null);
+  const [modal, setModal] = useState<"upgrade" | "sem_provider" | null>(null);
+  const [storageProvider, setStorageProvider] = useState<string>("supabase");
+  const [trocandoProvider, setTrocandoProvider] = useState(false);
 
   const load = useCallback(() => {
     getIntegracoes().then(setIntegracoes).catch(() => toast.error("Erro ao carregar integrações.")).finally(() => setLoading(false));
+    fetch("/api/storage/provider").then((r) => r.json()).then((d) => setStorageProvider(d.provider ?? "supabase")).catch(() => {});
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  const handleConectar = async (integracao: IntegracaoComStatus) => {
-    setConectando(integracao.id);
+  const trocarStorageProvider = async (provider: string) => {
+    setTrocandoProvider(true);
     try {
-      await conectarIntegracao(integracao.id);
-      toast.success(`${integracao.nome} conectado!`);
+      const res = await fetch("/api/storage/provider", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider }) });
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error ?? "Erro ao trocar armazenamento."); return; }
+      setStorageProvider(provider);
+      toast.success(provider === "supabase" ? "Voltou a usar o armazenamento padrão do ObraFlow." : "Novos documentos agora vão para o Google Drive.");
+    } finally { setTrocandoProvider(false); }
+  };
+
+  // Volta do fluxo OAuth (?integracao_conectada=... ou ?integracao_erro=...
+  // setado pela rota /api/integrations/[slug]/callback).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const conectada = params.get("integracao_conectada");
+    const erro = params.get("integracao_erro");
+    if (conectada) { toast.success("Integração conectada!"); load(); }
+    if (erro) toast.error("Não foi possível conectar a integração. Tente novamente.");
+    if (conectada || erro) window.history.replaceState(null, "", window.location.pathname);
+  }, [load]);
+
+  const handleDesconectar = async (i: IntegracaoComStatus) => {
+    setEmAcao(i.codigo);
+    try {
+      await desconectarIntegracao(i.codigo);
+      toast.success(`${i.nome} desconectado.`);
       await load();
-    } catch { toast.error("Erro ao conectar."); }
-    finally { setConectando(null); }
+    } catch { toast.error("Erro ao desconectar."); }
+    finally { setEmAcao(null); }
+  };
+
+  const handleTestar = async (i: IntegracaoComStatus) => {
+    setEmAcao(i.codigo);
+    try {
+      const ok = await testarConexaoIntegracao(i.codigo);
+      ok ? toast.success("Conexão funcionando.") : toast.error("A conexão falhou — pode ser necessário reconectar.");
+      await load();
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Erro ao testar conexão."); }
+    finally { setEmAcao(null); }
   };
 
   if (loading) return <p className="text-sm text-slate-400">Carregando...</p>;
 
+  const STATUS_INFO: Record<string, { texto: string; cor: string }> = {
+    conectado:     { texto: "Conectado", cor: "#10B981" },
+    erro:          { texto: "Erro na conexão", cor: "#EF4444" },
+    nao_conectado: { texto: "Não conectado", cor: "#94A3B8" },
+  };
+
   return (
     <div className="max-w-2xl">
       <p className="text-xs text-slate-400 mb-4">
-        Conexões externas opcionais, de acordo com o seu plano. Integrações internas da plataforma não aparecem aqui.
+        Conexões externas — Google Drive e Google Agenda estão inclusas em todos os planos.
+        Outras integrações dependem do seu plano atual.
       </p>
+
+      {(() => {
+        const googleDrive = integracoes.find((i) => i.codigo === "google_drive");
+        if (googleDrive?.status !== "conectado" || !pode("integracoes", "editar")) return null;
+        return (
+          <div className="card p-4 mb-4 flex items-center justify-between gap-4">
+            <div>
+              <p className="text-[13px] font-bold text-slate-900">Armazenamento de documentos</p>
+              <p className="text-xs text-slate-400">
+                {storageProvider === "google_drive"
+                  ? "Documentos novos vão para o seu Google Drive."
+                  : "Documentos novos ficam no armazenamento padrão do ObraFlow (Supabase). Documentos já enviados nunca mudam de lugar sozinhos."}
+              </p>
+            </div>
+            <Button
+              variant="secondary" size="sm" loading={trocandoProvider}
+              onClick={() => trocarStorageProvider(storageProvider === "google_drive" ? "supabase" : "google_drive")}
+            >
+              {storageProvider === "google_drive" ? "Usar armazenamento padrão" : "Usar Google Drive"}
+            </Button>
+          </div>
+        );
+      })()}
+
       <div className="space-y-3">
-        {integracoes.map((i) => (
-          <div key={i.id} className={`card p-5 ${!i.disponivelNoPlano ? "opacity-70" : ""}`}>
-            <div className="flex justify-between items-center gap-4">
-              <div className="flex items-start gap-3 min-w-0">
-                <span className="text-2xl flex-shrink-0">{ICONE_INTEGRACAO[i.codigo]}</span>
-                <div className="min-w-0">
-                  <p className="text-[13px] font-bold text-slate-900 mb-0.5">{i.nome}</p>
-                  <p className="text-xs text-slate-400">{i.descricao}</p>
+        {integracoes.map((i) => {
+          const statusInfo = STATUS_INFO[i.status];
+          const podeAlterar = pode("integracoes", "editar") || pode("integracoes", "criar");
+          return (
+            <div key={i.id} className={`card p-5 ${!i.disponivelNoPlano ? "opacity-70" : ""}`}>
+              <div className="flex justify-between items-center gap-4">
+                <div className="flex items-start gap-3 min-w-0">
+                  <span className="text-2xl flex-shrink-0">{ICONE_INTEGRACAO[i.codigo]}</span>
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-bold text-slate-900 mb-0.5">{i.nome}</p>
+                    <p className="text-xs text-slate-400 mb-1">{i.descricao}</p>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {i.categoria && <Badge color="#64748B">{CATEGORIA_LABEL[i.categoria] ?? i.categoria}</Badge>}
+                      <Badge color={i.disponivelNoPlano ? "#10B981" : "#94A3B8"}>
+                        {i.disponivelNoPlano ? "Incluso no plano" : "Disponível para upgrade"}
+                      </Badge>
+                      {i.status === "conectado" && i.lastSync && (
+                        <span className="text-[10px] text-slate-400">
+                          última sinc.: {new Date(i.lastSync).toLocaleString("pt-BR")}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                  <Badge color={statusInfo.cor}>{statusInfo.texto}</Badge>
+
+                  <div className="flex gap-1.5">
+                    {!i.disponivelNoPlano ? (
+                      <Button variant="secondary" size="sm" onClick={() => setModal("upgrade")}>Upgrade</Button>
+                    ) : i.status === "conectado" ? (
+                      podeAlterar && (
+                        <>
+                          <Button variant="secondary" size="sm" loading={emAcao === i.codigo} onClick={() => handleTestar(i)}>Testar conexão</Button>
+                          <Button variant="danger" size="sm" loading={emAcao === i.codigo} onClick={() => handleDesconectar(i)}>Desconectar</Button>
+                        </>
+                      )
+                    ) : (
+                      podeAlterar && (
+                        i.temProvider ? (
+                          <a href={urlConectarIntegracao(i.codigo)}>
+                            <Button variant="primary" size="sm">Conectar</Button>
+                          </a>
+                        ) : (
+                          <Button variant="secondary" size="sm" onClick={() => setModal("sem_provider")}>Conectar</Button>
+                        )
+                      )
+                    )}
+                  </div>
                 </div>
               </div>
-              <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                {!i.disponivelNoPlano ? (
-                  <Badge color="#94A3B8">Plano superior</Badge>
-                ) : i.status === "conectado" ? (
-                  <Badge color="#10B981">Conectado</Badge>
-                ) : (
-                  <Badge color="#94A3B8">Não conectado</Badge>
-                )}
-
-                {!i.disponivelNoPlano ? (
-                  <Button variant="secondary" size="sm" onClick={() => setModal("upgrade")}>Upgrade</Button>
-                ) : i.status === "conectado" ? (
-                  pode("integracoes", "editar") && (
-                    <Button variant="secondary" size="sm" onClick={() => setModal("configurar")}>Configurar</Button>
-                  )
-                ) : (
-                  pode("integracoes", "criar") && (
-                    <Button variant="primary" size="sm" loading={conectando === i.id} onClick={() => handleConectar(i)}>Conectar</Button>
-                  )
-                )}
-              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {modal && (
         <Modal onClose={() => setModal(null)} size="sm">
-          <ModalHeader title={modal === "upgrade" ? "Upgrade de plano" : "Configurar integração"} onClose={() => setModal(null)} />
+          <ModalHeader title={modal === "upgrade" ? "Upgrade de plano" : "Em breve"} onClose={() => setModal(null)} />
           <div className="p-5">
             <p className="text-sm text-slate-600">
               {modal === "upgrade"
                 ? "Essa integração está disponível em um plano superior. Fale com o time ObraFlow para fazer upgrade do seu plano."
-                : "As opções de configuração dessa integração chegam em breve."}
+                : "Essa integração ainda está em preparação e chega em uma próxima atualização."}
             </p>
           </div>
         </Modal>

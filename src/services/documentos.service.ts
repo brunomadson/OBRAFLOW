@@ -32,7 +32,25 @@ export async function getDocumentos(params: {
   return (data ?? []) as Documento[];
 }
 
+async function workspaceUsaStorageExterno(): Promise<boolean> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+  const { data } = await supabase
+    .from("profiles")
+    .select("workspace_id, workspaces(storage_provider)")
+    .eq("id", user.id)
+    .maybeSingle<{ workspace_id: string | null; workspaces: { storage_provider: string } | null }>();
+  return (data?.workspaces?.storage_provider ?? "supabase") !== "supabase";
+}
+
 // ── Upload ────────────────────────────────────────────────────────────────────
+//
+// Sprint 11.2 — storage híbrido: se o workspace usa Supabase (padrão,
+// imensa maioria dos casos hoje), segue o caminho direto de sempre, sem
+// nenhuma mudança de comportamento. Só quando o workspace conectou um
+// provider externo é que passamos pela rota /api/storage/documentos, que
+// decide onde salvar de verdade (e cai pro Supabase como reserva se o
+// provider externo falhar — ver documentoHibrido.service.ts).
 
 export async function uploadDocumento(params: {
   file: File;
@@ -43,7 +61,21 @@ export async function uploadDocumento(params: {
 }): Promise<Documento> {
   const { file, lead_id, obra_id, secao, tipo_doc } = params;
 
-  // Monta o caminho: {ownerId}/{secao}/{tipo_doc}_{timestamp}.{ext}
+  if (await workspaceUsaStorageExterno()) {
+    const form = new FormData();
+    form.append("file", file);
+    if (lead_id) form.append("lead_id", lead_id);
+    if (obra_id) form.append("obra_id", obra_id);
+    form.append("secao", secao);
+    form.append("tipo_doc", tipo_doc);
+
+    const res = await fetch("/api/storage/documentos", { method: "POST", body: form });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error ?? "Erro ao enviar documento.");
+    return data.documento as Documento;
+  }
+
+  // Caminho padrão Supabase (inalterado).
   const ownerId = lead_id ?? obra_id ?? "sem-id";
   const timestamp = Date.now();
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "bin";
@@ -51,12 +83,8 @@ export async function uploadDocumento(params: {
   const storagePath = `${ownerId}/${secao}/${nomeSeguro}_${timestamp}.${ext}`;
 
   const storage = getStorageProvider();
-
-  // 1. Envia para o storage
   await storage.upload({ file, path: storagePath });
 
-  // 2. Salva registro no banco (usuario_id identifica quem anexou — a RLS
-  // usa isso pra decidir quem pode editar/reenviar este documento depois)
   const { data: { user } } = await supabase.auth.getUser();
 
   const { data, error } = await supabase
@@ -76,7 +104,6 @@ export async function uploadDocumento(params: {
     .single();
 
   if (error) {
-    // Rollback do arquivo no storage se o banco falhar
     await storage.delete(storagePath).catch(() => {});
     throw error;
   }
@@ -85,25 +112,30 @@ export async function uploadDocumento(params: {
 }
 
 // ── Download (URL assinada temporária) ───────────────────────────────────────
+//
+// Sempre passa pela rota — ela mesma decide se o documento está no
+// externo ou no Supabase (por documento, não por workspace: um workspace
+// que trocou de provider pode ter documentos antigos em cada lugar).
 
-export async function getDocumentoUrl(storagePath: string): Promise<string> {
-  const storage = getStorageProvider();
-  return storage.getSignedUrl(storagePath, 3600); // 1 hora
+export async function getDocumentoUrl(documentoId: string): Promise<string> {
+  return `/api/storage/documentos/${documentoId}`;
 }
 
 // ── Exclusão ──────────────────────────────────────────────────────────────────
 
 export async function deleteDocumento(doc: Documento): Promise<void> {
-  const storage = getStorageProvider();
+  const res = await fetch(`/api/storage/documentos/${doc.id}`, { method: "DELETE" });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error ?? "Erro ao excluir documento.");
 
-  // 1. Remove do storage
-  await storage.delete(doc.storage_path);
+  // A rota já sabe se o arquivo físico estava no Drive (nada a fazer
+  // aqui) ou ainda no bucket do Supabase (inclusive documento
+  // 'pendente_migracao', que fisicamente nunca saiu de lá).
+  if (data.removerDoSupabase !== false) {
+    const storage = getStorageProvider();
+    await storage.delete(doc.storage_path).catch(() => {});
+  }
 
-  // 2. Marca como inativo no banco (soft delete)
-  const { error } = await supabase
-    .from("documentos")
-    .update({ ativo: false } as never)
-    .eq("id", doc.id);
-
+  const { error } = await supabase.from("documentos").update({ ativo: false } as never).eq("id", doc.id);
   if (error) throw error;
 }

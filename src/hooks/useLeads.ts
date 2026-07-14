@@ -12,6 +12,18 @@ function labelEtapaLead(etapa: string) {
   return ETAPAS_LEAD.find((e) => e.id === etapa)?.label ?? etapa;
 }
 
+// Fire-and-forget, mesmo espírito de registrarHistorico(...).catch(()=>{})
+// já usado neste arquivo — automação de pasta do Drive (Sprint 11.2) nunca
+// deve travar nem falhar visivelmente a ação principal do usuário. A rota
+// já é um no-op rápido pra quem não usa Google Drive.
+function dispararEventoPasta(leadId: string, evento: "documentacao" | "aprovada" | "reprovada" | "enviado_obras") {
+  fetch(`/api/storage/leads/${leadId}/folder-event`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ evento }),
+  }).catch(() => {});
+}
+
 export function useLeads() {
   const { profile } = useAuth();
   const nomeUsuario = profile?.nome ?? "Sistema";
@@ -85,6 +97,9 @@ export function useLeads() {
           tipo: "comercial", acao: acaoText,
           usuario_nome: nomeUsuario, usuario_id: null, setor: "comercial", etapa: novaEtapa,
         }).catch(() => {});
+        if (novaEtapa === "documentacao" || novaEtapa === "aprovada" || novaEtapa === "reprovada") {
+          dispararEventoPasta(leadId, novaEtapa);
+        }
         toast.success(`Lead movido para "${labelEtapaLead(novaEtapa)}"`);
         return atualizado;
       } catch {
@@ -167,6 +182,7 @@ export function useLeads() {
         )
       );
 
+      dispararEventoPasta(leadId, "enviado_obras");
       toast.success("Obra criada! O cliente aparece agora na etapa Projetos.");
       return true;
     } catch (err) {

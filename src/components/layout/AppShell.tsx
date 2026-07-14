@@ -7,6 +7,8 @@ import { useLeads } from "@/hooks/useLeads";
 import { useObras } from "@/hooks/useObras";
 import { useNotificacoes } from "@/hooks/useNotificacoes";
 import { useConfig } from "@/hooks/useConfig";
+import { useAssinaturaStatus } from "@/hooks/useAssinaturaStatus";
+import { useStorageUsage } from "@/hooks/useStorageUsage";
 import { getSetorInicial } from "@/lib/utils";
 
 export default function AppShell({ children }: { children: ReactNode }) {
@@ -17,6 +19,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const { obras } = useObras();
   const config = useConfig();
   const notifs = useNotificacoes(leads, obras, config, []);
+  const { pastDue } = useAssinaturaStatus();
+  const { percentUsed, proximoDoLimite } = useStorageUsage();
 
   const notifCount = notifs.filter((n) => n.tipo === "critico").length;
 
@@ -53,6 +57,16 @@ export default function AppShell({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-slate-50 flex font-sans">
       <Sidebar notifCount={notifCount} />
       <main className="ml-[200px] flex-1 min-w-0">
+        {pastDue && (
+          <div className="bg-amber-500 text-white text-xs font-semibold text-center py-2 px-4">
+            Pagamento atrasado — regularize a assinatura pra evitar a suspensão do acesso.
+          </div>
+        )}
+        {proximoDoLimite && (
+          <div className="bg-amber-500 text-white text-xs font-semibold text-center py-2 px-4">
+            Seu armazenamento está próximo do limite ({percentUsed}% usado) — considere conectar o Google Drive ou fazer upgrade de plano em Configurações → Integrações.
+          </div>
+        )}
         {children}
       </main>
     </div>

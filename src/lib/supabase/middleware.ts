@@ -41,13 +41,17 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
   const isAuthPage   = pathname.startsWith("/login") || pathname.startsWith("/cadastro");
+  const isBlockedPage = pathname.startsWith("/assinatura-pendente");
   const isPublicPage =
     pathname === "/" ||
     pathname.startsWith("/auth/callback") ||
     pathname.startsWith("/aceitar-convite") ||
     pathname.startsWith("/cadastro") ||
     pathname.startsWith("/onboarding") ||
-    pathname.startsWith("/reset-password");
+    pathname.startsWith("/reset-password") ||
+    pathname.startsWith("/api/webhooks") ||
+    pathname.startsWith("/api/integrations") ||
+    isBlockedPage;
 
   if (!user && !isAuthPage && !isPublicPage) {
     const url = request.nextUrl.clone();
@@ -59,6 +63,20 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/comercial";
     return NextResponse.redirect(url);
+  }
+
+  // Sprint 9 (Etapa 9) — bloqueio real de workspace sem assinatura válida
+  // (canceled/expired) ou suspenso manualmente (workspaces.ativo=false).
+  // Nunca confiar só no frontend: isso roda no servidor, em toda request.
+  // "Sem nenhuma assinatura" NUNCA bloqueia aqui (ver comentário na
+  // migration 042) — só um status explícito de cancelamento bloqueia.
+  if (user && !isAuthPage && !isBlockedPage && !pathname.startsWith("/api/webhooks") && !pathname.startsWith("/api/integrations")) {
+    const { data: status } = await supabase.rpc("get_workspace_access_status");
+    if (status === "blocked") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/assinatura-pendente";
+      return NextResponse.redirect(url);
+    }
   }
 
   // Retorna supabaseResponse (não NextResponse.next()) para garantir

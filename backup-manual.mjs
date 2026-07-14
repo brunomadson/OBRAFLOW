@@ -23,6 +23,7 @@ const TABELAS = [
   'documentos', 'historico', 'config', 'cidades', 'corretores',
   'correspondentes', 'workspace_invites', 'metas_dashboard',
   'planos', 'integracoes', 'plano_integracoes', 'workspace_integracoes',
+  'subscriptions', 'saas_admins', 'workspace_integration_logs',
 ];
 
 const timestamp = new Date().toISOString().replace(/:/g, '-').slice(0, 19);

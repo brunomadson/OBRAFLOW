@@ -33,5 +33,11 @@ export async function processarSessaoDoHash(): Promise<boolean> {
   // Tira o token da URL depois de usar — não deixa ficar no histórico do navegador.
   window.history.replaceState(null, "", window.location.pathname + window.location.search);
 
-  return !error;
+  if (error) {
+    // Propaga o motivo real (token expirado, já usado, etc.) em vez de só
+    // retornar false — quem chama pode mostrar isso na tela pra debug.
+    throw new Error(error.message);
+  }
+
+  return true;
 }

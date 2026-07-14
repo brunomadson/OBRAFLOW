@@ -6,10 +6,14 @@ import { getSetorInicial } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
+// Nunca cachear — cada visita traz um token de e-mail diferente.
+export const dynamic = "force-dynamic";
+
 export default function AceitarConvitePage() {
   const supabase = createClient();
   const router = useRouter();
   const [pronto, setPronto] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
   const [senha, setSenha] = useState("");
   const [confirmar, setConfirmar] = useState("");
   const [saving, setSaving] = useState(false);
@@ -25,25 +29,27 @@ export default function AceitarConvitePage() {
     // Processa manualmente o token do "#" da URL do e-mail de convite —
     // ver processarSessaoDoHash.ts pro motivo de não confiar só na
     // detecção automática do SDK.
-    processarSessaoDoHash().then((processou) => {
-      if (processou) { setPronto(true); return; }
-      // Sessão já existente (usuário já estava logado)?
-      supabase.auth.getSession().then(({ data }) => {
-        if (data.session) setPronto(true);
-      });
-    });
+    processarSessaoDoHash()
+      .then((processou) => {
+        if (processou) { setPronto(true); return; }
+        // Sessão já existente (usuário já estava logado)?
+        return supabase.auth.getSession().then(({ data }) => {
+          if (data.session) setPronto(true);
+        });
+      })
+      .catch((e) => setErro(e instanceof Error ? e.message : String(e)));
 
     return () => subscription.unsubscribe();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Sem sessão após 5 segundos → redireciona para login
+  // Sem sessão após alguns segundos → redireciona para login
   useEffect(() => {
     const timer = setTimeout(() => {
       if (!pronto) router.replace("/login");
-    }, 5000);
+    }, 6000);
     return () => clearTimeout(timer);
-  }, [pronto]);
+  }, [pronto, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,8 +83,11 @@ export default function AceitarConvitePage() {
 
   if (!pronto) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center gap-3 px-4">
         <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        {erro && (
+          <p className="text-red-400 text-xs text-center max-w-sm">Erro ao processar o convite: {erro}</p>
+        )}
       </div>
     );
   }

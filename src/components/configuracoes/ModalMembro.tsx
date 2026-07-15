@@ -68,7 +68,7 @@ export default function ModalMembro({ membro, onClose, onSave }: Props) {
           email: email.trim().toLowerCase(),
           options: {
             shouldCreateUser: true,
-            emailRedirectTo: `${window.location.origin}/auth/callback?next=/aceitar-convite`,
+            emailRedirectTo: `${window.location.origin}/aceitar-convite`,
           },
         });
 
@@ -107,6 +107,8 @@ export default function ModalMembro({ membro, onClose, onSave }: Props) {
       });
       toast.success("Membro atualizado!");
       onClose();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao salvar membro.");
     } finally {
       setSaving(false);
     }

@@ -152,7 +152,7 @@ async function criarWorkspaceEConvidarCeo(
     email: evento.email,
     options: {
       shouldCreateUser: true,
-      emailRedirectTo: `${siteUrl}/auth/callback?next=/aceitar-convite`,
+      emailRedirectTo: `${siteUrl}/aceitar-convite`,
     },
   });
   if (otpErr) {

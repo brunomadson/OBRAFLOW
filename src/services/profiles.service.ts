@@ -23,10 +23,21 @@ export async function getProfiles(): Promise<Profile[]> {
   return (data ?? []) as Profile[];
 }
 
-export async function upsertProfile(profile: Partial<Profile>): Promise<Profile> {
+// Edita um perfil já existente — nunca cria um novo. Perfil só é criado
+// pelo trigger handle_new_user (roda como SECURITY DEFINER, ignora RLS),
+// nunca direto pelo client. Por isso é update(), não upsert(): um
+// upsert() gera "INSERT ... ON CONFLICT DO UPDATE", e o Postgres exige
+// satisfazer a policy de INSERT também nesse caso (mesmo quando a linha
+// já existe e o caminho real é sempre UPDATE) — profiles nunca teve
+// policy de INSERT pra "authenticated", então upsert() falhava sempre
+// com "new row violates row-level security policy", inclusive num
+// self-edit onde a policy de UPDATE já permitia perfeitamente.
+export async function updateProfile(profile: Partial<Profile> & { id: string }): Promise<Profile> {
+  const { id, ...campos } = profile;
   const { data, error } = await supabase
     .from("profiles")
-    .upsert(profile as never)
+    .update(campos as never)
+    .eq("id", id)
     .select()
     .single();
   if (error) throw error;

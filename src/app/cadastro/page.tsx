@@ -29,7 +29,7 @@ export default function CadastroPage() {
       password: senha,
       options: {
         data: { nome: nome.trim() },
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
+        emailRedirectTo: `${window.location.origin}/onboarding`,
       },
     });
     setSubmitting(false);

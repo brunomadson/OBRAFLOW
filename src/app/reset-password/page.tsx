@@ -1,53 +1,35 @@
 "use client";
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { processarSessaoDoHash } from "@/lib/supabase/processarSessaoDoHash";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
 // Nunca cachear — cada visita traz um token de e-mail diferente.
 export const dynamic = "force-dynamic";
 
+// A partir da correção do fluxo de e-mail (token_hash, ver
+// /auth/callback/route.ts), a sessão já chega pronta via cookie antes
+// desta página carregar — não precisa mais processar nenhum token aqui,
+// só confiar que já está logado.
 export default function ResetPasswordPage() {
   const supabase = createClient();
   const router   = useRouter();
   const [pronto, setPronto] = useState(false);
-  const [erro, setErro] = useState<string | null>(null);
   const [senha, setSenha]     = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) setPronto(true);
-    });
-
-    // Processa manualmente o token do "#" do e-mail de recuperação — ver
-    // processarSessaoDoHash.ts pro motivo de não confiar só na detecção
-    // automática do SDK.
-    processarSessaoDoHash()
-      .then((processou) => {
-        if (processou) { setPronto(true); return; }
-        return supabase.auth.getSession().then(({ data }) => {
-          if (data.session) setPronto(true);
-        });
-      })
-      .catch((e) => setErro(e instanceof Error ? e.message : String(e)));
-
-    return () => subscription.unsubscribe();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Sem sessão após alguns segundos → link inválido/expirado
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!pronto) {
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) {
+        setPronto(true);
+      } else {
         toast.error("Link inválido ou expirado. Solicite a recuperação de senha novamente.");
         router.replace("/login");
       }
-    }, 6000);
-    return () => clearTimeout(timer);
-  }, [pronto, router]);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,11 +45,8 @@ export default function ResetPasswordPage() {
 
   if (!pronto) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex flex-col items-center justify-center gap-3 px-4">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex items-center justify-center px-4">
         <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-        {erro && (
-          <p className="text-red-500 text-xs text-center max-w-sm">Erro ao processar o link: {erro}</p>
-        )}
       </div>
     );
   }

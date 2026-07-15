@@ -10,7 +10,7 @@ import { getIntegracoes, urlConectarIntegracao, desconectarIntegracao, testarCon
 import { ICONE_INTEGRACAO, CATEGORIA_LABEL } from "@/constants/integracoes";
 import CurrencyInput from "@/components/ui/CurrencyInput";
 import Modal, { ModalHeader } from "@/components/ui/Modal";
-import { getProfiles, upsertProfile } from "@/services/profiles.service";
+import { getProfiles, updateProfile } from "@/services/profiles.service";
 import { getCargosComPermissoes, criarCargo, excluirCargo, atualizarPermissao } from "@/services/cargos.service";
 import { registrarHistorico } from "@/services/historico.service";
 import { useAuth } from "@/contexts/AuthContext";
@@ -181,7 +181,7 @@ function AbaMembros() {
 
   const handleSave = async (data: Partial<Profile>) => {
     const antes = typeof modal === "object" ? modal : null;
-    const depois = await upsertProfile(data as Parameters<typeof upsertProfile>[0]);
+    const depois = await updateProfile(data as Parameters<typeof updateProfile>[0]);
 
     if (antes && antes.cargo_id !== depois.cargo_id) {
       await registrarHistorico({

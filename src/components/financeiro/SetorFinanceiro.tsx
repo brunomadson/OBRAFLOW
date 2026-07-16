@@ -4,6 +4,7 @@ import { useFinanceiro } from "@/hooks/useFinanceiro";
 import { useMetas } from "@/hooks/useMetas";
 import { usePermissoes } from "@/hooks/usePermissoes";
 import { getObras } from "@/services/obras.service";
+import { getContasBancarias, createContaBancaria, deleteContaBancaria } from "@/services/contas-bancarias.service";
 import { cn, compareValues, fmtBRL, fmtDate, nextSort, type SortState } from "@/lib/utils";
 import Button from "@/components/ui/Button";
 import Modal, { ModalHeader } from "@/components/ui/Modal";
@@ -13,7 +14,7 @@ import {
   CATEGORIAS_SAIDA, CATEGORIAS_ENTRADA, GRUPOS_COR,
   FORMAS_PAGAMENTO, GRUPO_DE_CATEGORIA, GRUPOS_SAIDA_DRE, GRUPOS_SAIDA_ORDEM,
 } from "@/constants/financeiro";
-import type { Lancamento, Obra, StatusPagamento } from "@/types/app.types";
+import type { ContaBancaria, Lancamento, Obra, StatusPagamento } from "@/types/app.types";
 import toast from "react-hot-toast";
 
 /* ─── helpers ────────────────────────────────────────────────────────────────── */
@@ -112,6 +113,101 @@ function ModalPrioridades({ tipo, lancamentos, onClose }: {
   );
 }
 
+/* ─── ícone lixeira SVG ──────────────────────────────────────────────────────── */
+function IconTrash() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <path
+        d="M2 3.5h10M5.5 3.5V2.5a.5.5 0 01.5-.5h2a.5.5 0 01.5.5v1M5.5 6.5v4M8.5 6.5v4M3 3.5l.667 7.5a.5.5 0 00.5.5h5.667a.5.5 0 00.5-.5L11 3.5"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/* ─── sub-modal: Gerenciar Contas Bancárias ─────────────────────────────────── */
+function ModalNovaContaBancaria({ onClose, onSaved, onDeleted, contasBancarias }: {
+  onClose: () => void;
+  onSaved: (c: ContaBancaria) => void;
+  onDeleted: (id: string) => void;
+  contasBancarias: ContaBancaria[];
+}) {
+  const [nome, setNome] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const handleSave = async () => {
+    if (!nome.trim()) { toast.error("Informe o nome"); return; }
+    setSaving(true);
+    try {
+      const nova = await createContaBancaria(nome);
+      toast.success("Conta cadastrada!");
+      setNome("");
+      onSaved(nova);
+    } catch {
+      toast.error("Erro ao cadastrar conta");
+    } finally { setSaving(false); }
+  };
+
+  const handleDelete = async (id: string) => {
+    setDeletingId(id);
+    try {
+      await deleteContaBancaria(id);
+      onDeleted(id);
+    } catch {
+      toast.error("Erro ao remover conta");
+    } finally { setDeletingId(null); }
+  };
+
+  return (
+    <Modal onClose={onClose} size="sm">
+      <ModalHeader title="Gerenciar Contas / Bancos" onClose={onClose} />
+      <div className="p-5 space-y-4">
+        {/* Lista existente */}
+        <div>
+          <p className="field-label mb-2">Cadastradas ({contasBancarias.length})</p>
+          <div className="space-y-1 max-h-44 overflow-y-auto pr-1">
+            {contasBancarias.length === 0 && (
+              <p className="text-xs text-slate-400 text-center py-4">Nenhuma conta cadastrada</p>
+            )}
+            {contasBancarias.map((c) => (
+              <div
+                key={c.id}
+                className="flex items-center justify-between py-2 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors"
+              >
+                <span className="text-sm text-slate-700">{c.nome}</span>
+                <button
+                  onClick={() => handleDelete(c.id)}
+                  disabled={deletingId === c.id}
+                  title="Remover conta"
+                  className="text-slate-300 hover:text-red-400 transition-colors disabled:opacity-40 p-0.5 flex-shrink-0 ml-2"
+                >
+                  <IconTrash />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Formulário de adição */}
+        <div className="border-t border-slate-100 pt-4 space-y-3">
+          <p className="field-label">Adicionar Nova</p>
+          <div>
+            <label className="field-label">Nome *</label>
+            <input value={nome} onChange={(e) => setNome(e.target.value)} className="input-base" placeholder="Ex: Santander, Nubank - PJ, Dinheiro" />
+          </div>
+          <Button variant="primary" className="w-full" loading={saving} onClick={handleSave}>Cadastrar</Button>
+        </div>
+
+        <Button variant="secondary" className="w-full" onClick={onClose} size="sm">Fechar</Button>
+      </div>
+    </Modal>
+  );
+}
+
 /* ─── Modal de Lançamento ────────────────────────────────────────────────────── */
 interface ModalLancamentoProps {
   initial?: Lancamento | null;
@@ -132,11 +228,18 @@ function ModalLancamento({ initial, obras, onClose, onSave }: ModalLancamentoPro
   const [status, setStatus]       = useState<StatusPagamento>(initial?.status_pagamento ?? "pendente");
   const [obraId, setObraId]       = useState(initial?.obra_id ?? "");
   const [obs, setObs]             = useState(initial?.obs ?? "");
+  const [contasBancarias, setContasBancarias] = useState<ContaBancaria[]>([]);
+  const [contaBancariaId, setContaBancariaId] = useState(initial?.conta_bancaria_id ?? "");
+  const [showNovaConta, setShowNovaConta]     = useState(false);
   const [parcelado, setParcelado]       = useState(false);
   const [nParc, setNParc]               = useState(2);
   const [parcDatas, setParcDatas]       = useState<string[]>([]);
   const [showPreview, setShowPreview]   = useState(false);
   const [saving, setSaving]             = useState(false);
+
+  useEffect(() => {
+    getContasBancarias().then(setContasBancarias).catch(() => {});
+  }, []);
 
   const cats = tipo === "entrada" ? CATEGORIAS_ENTRADA : CATEGORIAS_SAIDA;
   const grupo = GRUPO_DE_CATEGORIA[categoria] ?? "";
@@ -188,7 +291,7 @@ function ModalLancamento({ initial, obras, onClose, onSave }: ModalLancamentoPro
           data: d, data_vencimento: d || null, data_confirmacao: null,
           forma_pagamento: forma, status_pagamento: "pendente" as StatusPagamento,
           parcela_num: i + 1, parcela_total: nParc,
-          obra_id: obraId || null, obs: obs || null,
+          obra_id: obraId || null, conta_bancaria_id: contaBancariaId || null, obs: obs || null,
         }));
         await onSave(lista);
       } else {
@@ -198,7 +301,7 @@ function ModalLancamento({ initial, obras, onClose, onSave }: ModalLancamentoPro
           data_vencimento: dataVenc || null, data_confirmacao: null,
           forma_pagamento: forma, status_pagamento: tipo === "entrada" ? "pago" : status,
           parcela_num: null, parcela_total: null,
-          obra_id: obraId || null, obs: obs || null,
+          obra_id: obraId || null, conta_bancaria_id: contaBancariaId || null, obs: obs || null,
         }]);
       }
       onClose();
@@ -206,6 +309,7 @@ function ModalLancamento({ initial, obras, onClose, onSave }: ModalLancamentoPro
   };
 
   return (
+    <>
     <Modal onClose={onClose} size="lg">
       <ModalHeader title={isEdit ? "Editar Lançamento" : "Novo Lançamento"} onClose={onClose} />
       <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
@@ -301,7 +405,7 @@ function ModalLancamento({ initial, obras, onClose, onSave }: ModalLancamentoPro
           )}
         </div>
 
-        {/* Obra + Obs */}
+        {/* Obra + Conta Bancária */}
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="field-label">Obra (opcional)</label>
@@ -311,9 +415,26 @@ function ModalLancamento({ initial, obras, onClose, onSave }: ModalLancamentoPro
             </select>
           </div>
           <div>
-            <label className="field-label">Observações</label>
-            <input value={obs} onChange={(e) => setObs(e.target.value)} className="input-base" placeholder="Opcional" />
+            <label className="field-label">Conta / Banco (opcional)</label>
+            <div className="flex gap-1.5">
+              <select value={contaBancariaId} onChange={(e) => setContaBancariaId(e.target.value)} className="input-base flex-1">
+                <option value="">Sem conta</option>
+                {contasBancarias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+              </select>
+              <button
+                type="button"
+                onClick={() => setShowNovaConta(true)}
+                title="Cadastrar nova conta"
+                className="flex-shrink-0 w-9 h-9 rounded-lg border border-slate-200 bg-white hover:bg-blue-50 hover:border-blue-400 text-slate-500 hover:text-blue-500 flex items-center justify-center text-lg font-bold transition-colors"
+              >+</button>
+            </div>
           </div>
+        </div>
+
+        {/* Observações */}
+        <div>
+          <label className="field-label">Observações</label>
+          <input value={obs} onChange={(e) => setObs(e.target.value)} className="input-base" placeholder="Opcional" />
         </div>
 
         {/* Parcelado (só saídas, não edição) */}
@@ -397,6 +518,7 @@ function ModalLancamento({ initial, obras, onClose, onSave }: ModalLancamentoPro
             </div>
             {dataVenc && <div className="flex justify-between"><span className="text-slate-500">Vencimento</span><span>{fmtDate(dataVenc)}</span></div>}
             {obraId && <div className="flex justify-between"><span className="text-slate-500">Obra</span><span>{obras.find(o => o.id === obraId)?.nome}</span></div>}
+            {contaBancariaId && <div className="flex justify-between"><span className="text-slate-500">Conta</span><span>{contasBancarias.find(c => c.id === contaBancariaId)?.nome}</span></div>}
           </div>
         )}
       </div>
@@ -408,6 +530,22 @@ function ModalLancamento({ initial, obras, onClose, onSave }: ModalLancamentoPro
         </Button>
       </div>
     </Modal>
+    {showNovaConta && (
+      <ModalNovaContaBancaria
+        contasBancarias={contasBancarias}
+        onClose={() => setShowNovaConta(false)}
+        onSaved={(nova) => {
+          setContasBancarias((prev) => [...prev, nova].sort((a, b) => a.nome.localeCompare(b.nome)));
+          setContaBancariaId(nova.id);
+          setShowNovaConta(false);
+        }}
+        onDeleted={(id) => {
+          setContasBancarias((prev) => prev.filter((c) => c.id !== id));
+          setContaBancariaId((prev) => (prev === id ? "" : prev));
+        }}
+      />
+    )}
+    </>
   );
 }
 

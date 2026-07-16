@@ -62,6 +62,11 @@ export const CIDADES = [
   "Tuntum",
   "Presidente Dutra",
   "Capinzal do Norte",
+  "Dom Pedro",
+  "Santo Antônio dos Lopes",
+  "PIO XII",
+  "São Mateus",
+  "Governador Luiz Rocha",
 ];
 
 export const ENGENHEIROS = [

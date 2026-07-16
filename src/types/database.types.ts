@@ -151,6 +151,18 @@ export type Database = {
         Insert: Omit<Database["public"]["Tables"]["correspondentes"]["Row"], "id" | "created_at">;
         Update: Partial<Database["public"]["Tables"]["correspondentes"]["Insert"]>;
       };
+      contas_bancarias: {
+        Row: {
+          id: string;
+          nome: string;
+          ativo: boolean;
+          workspace_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["contas_bancarias"]["Row"], "id" | "created_at" | "updated_at">;
+        Update: Partial<Database["public"]["Tables"]["contas_bancarias"]["Insert"]>;
+      };
       obras: {
         Row: {
           id: string;
@@ -241,6 +253,7 @@ export type Database = {
           status_pagamento: "pendente" | "pago" | "vencido";
           parcela_num: number | null;
           parcela_total: number | null;
+          conta_bancaria_id: string | null;
           obs: string | null;
           workspace_id: string | null;
           created_at: string;

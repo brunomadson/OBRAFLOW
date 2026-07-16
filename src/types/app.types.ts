@@ -78,6 +78,14 @@ export interface Corretor {
   workspace_id?: string | null;
 }
 
+// ─── Domínio: Conta Bancária ────────────────────────────────────────────────
+export interface ContaBancaria {
+  id: string;
+  nome: string;
+  ativo: boolean;
+  workspace_id?: string | null;
+}
+
 // ─── Domínio: Lead ────────────────────────────────────────────────────────────
 export type ComMuro = "sem_muro" | "com_muro" | "muro_parcial";
 export type EtapaLead =
@@ -307,6 +315,7 @@ export interface Lancamento {
   status_pagamento: StatusPagamento;
   parcela_num: number | null;
   parcela_total: number | null;
+  conta_bancaria_id: string | null;
   obs: string | null;
   workspace_id?: string | null;
   created_at: string;

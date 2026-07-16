@@ -1,5 +1,5 @@
 "use client";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Modal, { ModalHeader } from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
@@ -14,8 +14,145 @@ import ModalMedicao from "./ModalMedicao";
 import { ETAPAS_OBRA, FLUXO_OBRA } from "@/constants/etapas";
 import { CIDADES, ENGENHEIROS, MODALIDADES, ORIGENS, ORIGENS_RECURSO, TIPOS_RENDA } from "@/constants/dominios";
 import { fmtBRL, fmtDate, maskCPF, maskPhone } from "@/lib/utils";
-import type { Obra, Medicao, EtapaObra, EngCaixaObra, ConformidadeObra, StatusItem } from "@/types/app.types";
+import { getCorrespondentes, createCorrespondente, deleteCorrespondente } from "@/services/correspondentes.service";
+import type { Obra, Medicao, EtapaObra, EngCaixaObra, ConformidadeObra, StatusItem, Correspondente } from "@/types/app.types";
 import toast from "react-hot-toast";
+
+/* ───────── helper: label do correspondente ──────────────────────────────── */
+function corrLabel(c: Correspondente) {
+  const ag = c.agencia || c.banco || "";
+  return ag ? `${c.nome} — ${ag}` : c.nome;
+}
+
+/* ───────── ícone lixeira SVG ─────────────────────────────────────────────── */
+function IconTrash() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <path
+        d="M2 3.5h10M5.5 3.5V2.5a.5.5 0 01.5-.5h2a.5.5 0 01.5.5v1M5.5 6.5v4M8.5 6.5v4M3 3.5l.667 7.5a.5.5 0 00.5.5h5.667a.5.5 0 00.5-.5L11 3.5"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/* ───────── sub-modal: Gerenciar Correspondentes ──────────────────────────── */
+function ModalNovoCorrespondente({
+  onClose, onSaved, onDeleted, correspondentes,
+}: {
+  onClose: () => void;
+  onSaved: (c: Correspondente) => void;
+  onDeleted: (id: string) => void;
+  correspondentes: Correspondente[];
+}) {
+  const [form, setForm] = useState({ nome: "", contato: "", email: "", cidade: "", agencia: "" });
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const set = (k: keyof typeof form, v: string) => setForm((p) => ({ ...p, [k]: v }));
+
+  const handleSave = async () => {
+    if (!form.nome.trim()) { toast.error("Informe o nome"); return; }
+    setSaving(true);
+    try {
+      const novo = await createCorrespondente({
+        nome: form.nome,
+        contato: form.contato || null,
+        email: form.email || null,
+        cidade: form.cidade || null,
+        agencia: form.agencia || null,
+      });
+      toast.success("Correspondente cadastrado!");
+      setForm({ nome: "", contato: "", email: "", cidade: "", agencia: "" });
+      onSaved(novo);
+    } catch {
+      toast.error("Erro ao cadastrar correspondente");
+    } finally { setSaving(false); }
+  };
+
+  const handleDelete = async (id: string) => {
+    setDeletingId(id);
+    try {
+      await deleteCorrespondente(id);
+      onDeleted(id);
+    } catch {
+      toast.error("Erro ao remover correspondente");
+    } finally { setDeletingId(null); }
+  };
+
+  return (
+    <Modal onClose={onClose} size="sm">
+      <ModalHeader title="Gerenciar Correspondentes" onClose={onClose} />
+      <div className="p-5 space-y-4">
+        {/* Lista existente */}
+        <div>
+          <p className="field-label mb-2">Cadastrados ({correspondentes.length})</p>
+          <div className="space-y-1 max-h-44 overflow-y-auto pr-1">
+            {correspondentes.length === 0 && (
+              <p className="text-xs text-slate-400 text-center py-4">Nenhum correspondente cadastrado</p>
+            )}
+            {correspondentes.map((c) => (
+              <div
+                key={c.id}
+                className="flex items-center justify-between py-2 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors"
+              >
+                <div className="min-w-0">
+                  <span className="text-sm text-slate-700">{c.nome}</span>
+                  {(c.agencia || c.banco) && (
+                    <span className="text-[11px] text-slate-400 ml-2">— {c.agencia || c.banco}</span>
+                  )}
+                </div>
+                <button
+                  onClick={() => handleDelete(c.id)}
+                  disabled={deletingId === c.id}
+                  title="Remover correspondente"
+                  className="text-slate-300 hover:text-red-400 transition-colors disabled:opacity-40 p-0.5 flex-shrink-0 ml-2"
+                >
+                  <IconTrash />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Formulário de adição */}
+        <div className="border-t border-slate-100 pt-4 space-y-3">
+          <p className="field-label">Adicionar Novo</p>
+          <div>
+            <label className="field-label">Nome *</label>
+            <input value={form.nome} onChange={(e) => set("nome", e.target.value)} className="input-base" placeholder="Ex: Genilza" />
+          </div>
+          <div>
+            <label className="field-label">Agência / Banco</label>
+            <input value={form.agencia} onChange={(e) => set("agencia", e.target.value)} className="input-base" placeholder="Ex: Agência Presidente Dutra" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="field-label">Telefone</label>
+              <input value={form.contato} onChange={(e) => set("contato", maskPhone(e.target.value))} maxLength={15} className="input-base" placeholder="(00) 00000-0000" />
+            </div>
+            <div>
+              <label className="field-label">E-mail</label>
+              <input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} className="input-base" placeholder="email@banco.com" />
+            </div>
+          </div>
+          <div>
+            <label className="field-label">Cidade</label>
+            <select value={form.cidade} onChange={(e) => set("cidade", e.target.value)} className="input-base">
+              <option value="">Selecione</option>
+              {CIDADES.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <Button variant="primary" className="w-full" loading={saving} onClick={handleSave}>Cadastrar</Button>
+        </div>
+
+        <Button variant="secondary" className="w-full" onClick={onClose} size="sm">Fechar</Button>
+      </div>
+    </Modal>
+  );
+}
 
 type Tab = "perfil" | "medicoes" | "documentos" | "historico" | "editar";
 
@@ -275,6 +412,10 @@ export default function ModalObra({ obra, onClose, onSave, onAvancar, onSalvarMe
   const [form, setForm]   = useState<Partial<Obra>>(obra ?? EMPTY_OBRA);
   const [saving, setSaving] = useState(false);
   const [editMedicao, setEditMedicao] = useState<{ medicao: Partial<Medicao> | null } | null>(null);
+  const [correspondentes, setCorrespondentes] = useState<Correspondente[]>([]);
+  const [showNovoCorrespondente, setShowNovoCorrespondente] = useState(false);
+
+  useEffect(() => { getCorrespondentes().then(setCorrespondentes).catch(() => {}); }, []);
 
   const etapaAtual = ETAPAS_OBRA.find((e) => e.id === form.etapa);
   const prox       = FLUXO_OBRA.indexOf(form.etapa ?? "contrato");
@@ -613,6 +754,34 @@ export default function ModalObra({ obra, onClose, onSave, onAvancar, onSalvarMe
                 </div>
               </div>
 
+              {/* Correspondente Bancário */}
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Correspondente Bancário</p>
+                <div className="grid grid-cols-2 gap-3.5">
+                  <div className="col-span-2">
+                    <label className="field-label">Correspondente</label>
+                    <div className="flex gap-1.5">
+                      <select
+                        value={form.correspondente_id ?? ""}
+                        onChange={(e) => set("correspondente_id", e.target.value || null)}
+                        className="input-base flex-1"
+                      >
+                        <option value="">Selecionar correspondente</option>
+                        {correspondentes.map((c) => (
+                          <option key={c.id} value={c.id}>{corrLabel(c)}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setShowNovoCorrespondente(true)}
+                        title="Cadastrar novo correspondente"
+                        className="flex-shrink-0 w-9 h-9 rounded-lg border border-slate-200 bg-white hover:bg-blue-50 hover:border-blue-400 text-slate-500 hover:text-blue-500 flex items-center justify-center text-lg font-bold transition-colors"
+                      >+</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Imóvel */}
               <div>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Imóvel</p>
@@ -712,6 +881,22 @@ export default function ModalObra({ obra, onClose, onSave, onAvancar, onSalvarMe
           onClose={() => setEditMedicao(null)}
           onSave={onSalvarMedicao}
           onDelete={editMedicao.medicao?.id ? onRemoverMedicao : undefined}
+        />
+      )}
+
+      {showNovoCorrespondente && (
+        <ModalNovoCorrespondente
+          correspondentes={correspondentes}
+          onClose={() => setShowNovoCorrespondente(false)}
+          onSaved={(novo) => {
+            setCorrespondentes((prev) => [...prev, novo].sort((a, b) => a.nome.localeCompare(b.nome)));
+            set("correspondente_id", novo.id);
+            setShowNovoCorrespondente(false);
+          }}
+          onDeleted={(id) => {
+            setCorrespondentes((prev) => prev.filter((c) => c.id !== id));
+            if (form.correspondente_id === id) set("correspondente_id", null);
+          }}
         />
       )}
     </>

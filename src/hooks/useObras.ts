@@ -66,8 +66,9 @@ export function useObras() {
   const avancarEtapa = useCallback(async (obra: Obra, novaEtapa: EtapaObra): Promise<void> => {
     try {
       const etapaAnterior = obra.etapa;
+      // O gatilho "obras_log_etapa" no banco já registra o obra_log automaticamente
+      // ao mudar a coluna etapa (com o user_id correto via auth.uid()) — não duplicar aqui.
       await updateObra(obra.id, { etapa: novaEtapa });
-      await registrarLogObra(obra.id, novaEtapa);
       setObras((prev) =>
         prev.map((o) =>
           o.id === obra.id

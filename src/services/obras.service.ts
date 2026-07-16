@@ -29,7 +29,7 @@ export async function createObra(payload: Omit<Obra, "id" | "created_at" | "upda
   const { data, error } = await supabase
     .from("obras")
     .insert(payload as never)
-    .select()
+    .select("*, correspondente:correspondentes(*)")
     .single();
 
   if (error) throw error;
@@ -43,7 +43,7 @@ export async function updateObra(id: string, payload: Partial<Obra>): Promise<Ob
     .from("obras")
     .update(rest as never)
     .eq("id", id)
-    .select()
+    .select("*, correspondente:correspondentes(*)")
     .single();
 
   if (error) throw error;

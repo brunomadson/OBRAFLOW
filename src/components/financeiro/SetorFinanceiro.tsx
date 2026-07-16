@@ -411,7 +411,7 @@ function ModalLancamento({ initial, obras, onClose, onSave }: ModalLancamentoPro
             <label className="field-label">Obra (opcional)</label>
             <select value={obraId} onChange={(e) => setObraId(e.target.value)} className="input-base">
               <option value="">Sem obra</option>
-              {obras.map((o) => <option key={o.id} value={o.id}>{o.nome}</option>)}
+              {obras.map((o) => <option key={o.id} value={o.id}>{o.cliente ?? o.nome}</option>)}
             </select>
           </div>
           <div>
@@ -517,7 +517,7 @@ function ModalLancamento({ initial, obras, onClose, onSave }: ModalLancamentoPro
               </span>
             </div>
             {dataVenc && <div className="flex justify-between"><span className="text-slate-500">Vencimento</span><span>{fmtDate(dataVenc)}</span></div>}
-            {obraId && <div className="flex justify-between"><span className="text-slate-500">Obra</span><span>{obras.find(o => o.id === obraId)?.nome}</span></div>}
+            {obraId && <div className="flex justify-between"><span className="text-slate-500">Obra</span><span>{obras.find(o => o.id === obraId)?.cliente ?? obras.find(o => o.id === obraId)?.nome}</span></div>}
             {contaBancariaId && <div className="flex justify-between"><span className="text-slate-500">Conta</span><span>{contasBancarias.find(c => c.id === contaBancariaId)?.nome}</span></div>}
           </div>
         )}
@@ -1212,7 +1212,7 @@ function lancSortValue(l: Lancamento, key: LancSortKey, obras: Obra[]): string |
     case "data":            return l.data ? new Date(l.data).getTime() : null;
     case "categoria":       return l.categoria;
     case "descricao":       return l.descricao;
-    case "obra":            return obras.find((o) => o.id === l.obra_id)?.nome ?? null;
+    case "obra":            { const o = obras.find((o) => o.id === l.obra_id); return o ? (o.cliente ?? o.nome) : null; }
     case "forma_pagamento": return l.forma_pagamento;
     case "data_vencimento": return l.data_vencimento ? new Date(l.data_vencimento).getTime() : null;
     case "status":          return STATUS_ORDEM[statusReal(l)];
@@ -1272,7 +1272,7 @@ function TabLancamentos({ lancamentos, obras, onEditar, onRemover, onPagar }: {
         </select>
         <select value={obraF} onChange={(e) => setObraF(e.target.value)} className="input-base w-44 !py-1.5">
           <option value="">Todas as obras</option>
-          {obras.map((o) => <option key={o.id} value={o.id}>{o.nome}</option>)}
+          {obras.map((o) => <option key={o.id} value={o.id}>{o.cliente ?? o.nome}</option>)}
         </select>
         <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar..."
           className="border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 outline-none focus:border-blue-400 w-40" />
@@ -1328,7 +1328,7 @@ function TabLancamentos({ lancamentos, obras, onEditar, onRemover, onPagar }: {
                     {l.descricao}
                     {isParc && <span className="ml-1 text-[10px] text-blue-400">({l.parcela_num}/{l.parcela_total})</span>}
                   </td>
-                  <td className="px-3 py-2.5 text-slate-400 text-[11px]">{obra?.nome ?? "—"}</td>
+                  <td className="px-3 py-2.5 text-slate-400 text-[11px]">{obra?.cliente ?? obra?.nome ?? "—"}</td>
                   <td className="px-3 py-2.5 text-slate-500">{l.forma_pagamento ?? "—"}</td>
                   <td className="px-3 py-2.5 text-slate-400 whitespace-nowrap">{l.data_vencimento ? fmtDate(l.data_vencimento) : "—"}</td>
                   <td className="px-3 py-2.5">

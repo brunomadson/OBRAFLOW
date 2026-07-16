@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Sidebar from "./Sidebar";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,14 +15,24 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const { user, profile, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const { leads } = useLeads();
-  const { obras } = useObras();
+  const { leads, reload: reloadLeads } = useLeads();
+  const { obras, reload: reloadObras } = useObras();
   const config = useConfig();
   const notifs = useNotificacoes(leads, obras, config, []);
   const { pastDue } = useAssinaturaStatus();
   const { percentUsed, proximoDoLimite } = useStorageUsage();
 
   const notifCount = notifs.filter((n) => n.tipo === "critico").length;
+
+  // O badge do sidebar é calculado a partir de leads/obras buscados só uma vez
+  // no mount — sem isso, ele fica desatualizado (alertas já resolvidos
+  // continuam contando) enquanto o usuário navega pelo app sem dar F5.
+  const primeiraRenderizacao = useRef(true);
+  useEffect(() => {
+    if (primeiraRenderizacao.current) { primeiraRenderizacao.current = false; return; }
+    reloadLeads();
+    reloadObras();
+  }, [pathname, reloadLeads, reloadObras]);
 
   useEffect(() => {
     if (loading) return;

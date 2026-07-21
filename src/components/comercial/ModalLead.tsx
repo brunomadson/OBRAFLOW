@@ -673,6 +673,10 @@ function FormLead({
               {ORIGENS.map((o) => <option key={o}>{o}</option>)}
             </select>
           </div>
+          <div>
+            <label className="field-label">Data de Contato</label>
+            <input type="date" value={lead.data_contato ?? ""} onChange={(e) => set("data_contato", e.target.value || null)} className="input-base" />
+          </div>
           {lead.origem === "Corretor" && (
             <div>
               <label className="field-label">Corretor</label>
@@ -928,7 +932,7 @@ export default function ModalLead({ lead, onClose, onSave, onAvancar, onEnviarOb
   const isNovo = !lead;
 
   const [tab, setTab]           = useState<Tab>(isNovo ? "editar" : "perfil");
-  const [form, setForm]         = useState<Partial<Lead>>(lead ?? EMPTY_LEAD);
+  const [form, setForm]         = useState<Partial<Lead>>(() => lead ?? { ...EMPTY_LEAD, data_contato: new Date().toISOString().slice(0, 10) });
   const [saving, setSaving]     = useState(false);
   const [subModal, setSubModal] = useState<SubModal>(null);
   const [correspondentes, setCorrespondentes] = useState<Correspondente[]>([]);

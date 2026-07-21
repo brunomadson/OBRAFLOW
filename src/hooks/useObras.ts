@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { getObras, createObra, updateObra, registrarLogObra, upsertMedicao, deleteMedicao } from "@/services/obras.service";
+import { getObras, createObra, updateObra, registrarLogObra, upsertMedicao, deleteMedicao, ordenarPorNome } from "@/services/obras.service";
 import { registrarHistorico } from "@/services/historico.service";
 import { useAuth } from "@/contexts/AuthContext";
 import { ETAPAS_OBRA } from "@/constants/etapas";
@@ -47,13 +47,13 @@ export function useObras() {
     try {
       if (obra.id) {
         const atualizada = await updateObra(obra.id, obra);
-        setObras((prev) => prev.map((o) => (o.id === atualizada.id ? { ...atualizada, medicoes: obra.medicoes, log: obra.log } : o)));
+        setObras((prev) => ordenarPorNome(prev.map((o) => (o.id === atualizada.id ? { ...atualizada, medicoes: obra.medicoes, log: obra.log } : o))));
         toast.success("Obra salva!");
         return atualizada;
       } else {
         const nova = await createObra(obra as never);
         await registrarLogObra(nova.id, nova.etapa);
-        setObras((prev) => [nova, ...prev]);
+        setObras((prev) => ordenarPorNome([nova, ...prev]));
         toast.success("Obra criada!");
         return nova;
       }

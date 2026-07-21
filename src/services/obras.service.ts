@@ -4,14 +4,29 @@ import type { Obra, Medicao } from "@/types/app.types";
 
 const supabase = createClient();
 
+// Nome de exibição da obra — "cliente" é a coluna real e sempre preenchida;
+// "nome" existe só por legado e várias obras (ex: as importadas) ficam com
+// ele nulo. Ver histórico: obra.nome sumindo em listas/selects do Financeiro.
+function nomeObra(o: Pick<Obra, "cliente" | "nome">): string {
+  return (o.cliente ?? o.nome ?? "").trim();
+}
+
+// Ordem padrão do sistema inteiro: nome da obra A→Z, ignorando acento e
+// caixa (ex: "Ana, Álvaro, Bruno..."). Centralizado aqui — todo componente
+// que usa getObras()/useObras() herda essa ordenação automaticamente, sem
+// precisar ordenar de novo na tela. Exportada pra useObras() reaplicar
+// depois de updates otimistas locais (nova obra criada, nome editado etc.).
+export function ordenarPorNome(obras: Obra[]): Obra[] {
+  return [...obras].sort((a, b) => nomeObra(a).localeCompare(nomeObra(b), "pt-BR", { sensitivity: "base" }));
+}
+
 export async function getObras(): Promise<Obra[]> {
   const { data, error } = await supabase
     .from("obras")
-    .select("*, log:obra_log(*), medicoes(*), correspondente:correspondentes(*)")
-    .order("updated_at", { ascending: false });
+    .select("*, log:obra_log(*), medicoes(*), correspondente:correspondentes(*)");
 
   if (error) throw error;
-  return (data ?? []) as unknown as Obra[];
+  return ordenarPorNome((data ?? []) as unknown as Obra[]);
 }
 
 export async function getObra(id: string): Promise<Obra | null> {

@@ -1,0 +1,796 @@
+<title>ObraFlow — Due Diligence: Módulo Serviços Técnicos</title>
+<style>
+  :root {
+    --bg: #FAFAF9;
+    --bg-raised: #FFFFFF;
+    --text: #1C2333;
+    --text-muted: #5B6472;
+    --text-faint: #8891A0;
+    --border: #E4E7EC;
+    --border-strong: #CBD2DC;
+    --accent: #2452D9;
+    --accent-soft: #EEF2FF;
+    --accent-text: #23408A;
+    --good: #0F7A5C;
+    --good-soft: #E8F6F0;
+    --warn: #B4650A;
+    --warn-soft: #FCF1E1;
+    --critical: #C22B3D;
+    --critical-soft: #FCEBED;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Consolas, monospace;
+    --sans: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --shadow: 0 1px 2px rgba(20, 24, 38, 0.04), 0 4px 16px rgba(20, 24, 38, 0.05);
+  }
+  :root[data-theme="dark"] {
+    --bg: #0E1220;
+    --bg-raised: #171C2D;
+    --text: #E7E9F0;
+    --text-muted: #9CA3B5;
+    --text-faint: #6C7488;
+    --border: #2A3047;
+    --border-strong: #3A4160;
+    --accent: #7C93FF;
+    --accent-soft: #1D2340;
+    --accent-text: #B4C1FF;
+    --good: #4FCE9F;
+    --good-soft: #14332A;
+    --warn: #F0AE55;
+    --warn-soft: #3A2A12;
+    --critical: #F27585;
+    --critical-soft: #3A1B22;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0E1220;
+      --bg-raised: #171C2D;
+      --text: #E7E9F0;
+      --text-muted: #9CA3B5;
+      --text-faint: #6C7488;
+      --border: #2A3047;
+      --border-strong: #3A4160;
+      --accent: #7C93FF;
+      --accent-soft: #1D2340;
+      --accent-text: #B4C1FF;
+      --good: #4FCE9F;
+      --good-soft: #14332A;
+      --warn: #F0AE55;
+      --warn-soft: #3A2A12;
+      --critical: #F27585;
+      --critical-soft: #3A1B22;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { background: var(--bg); }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 15.5px;
+    line-height: 1.65;
+    margin: 0;
+    padding: 0 20px 120px;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; }
+
+  /* ── Header ─────────────────────────────────────────────────────────── */
+  header.doc-head {
+    padding: 56px 0 32px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 36px;
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent-text);
+    background: var(--accent-soft);
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 4px;
+    margin-bottom: 18px;
+  }
+  h1 {
+    font-family: var(--mono);
+    font-size: 30px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 0 0 10px;
+    text-wrap: balance;
+  }
+  .subtitle {
+    color: var(--text-muted);
+    font-size: 16px;
+    max-width: 60ch;
+    margin: 0 0 20px;
+  }
+  .meta-row {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-faint);
+  }
+  .meta-row strong { color: var(--text-muted); font-weight: 600; }
+
+  /* ── TOC ─────────────────────────────────────────────────────────────── */
+  nav.toc {
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin-bottom: 48px;
+    box-shadow: var(--shadow);
+  }
+  nav.toc p {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin: 0 0 12px;
+  }
+  nav.toc ol {
+    columns: 2;
+    column-gap: 32px;
+    margin: 0;
+    padding-left: 20px;
+    font-size: 13.5px;
+  }
+  nav.toc li { margin-bottom: 6px; break-inside: avoid; }
+  nav.toc a { color: var(--text); text-decoration: none; }
+  nav.toc a:hover { color: var(--accent); text-decoration: underline; }
+
+  /* ── Sections ────────────────────────────────────────────────────────── */
+  section { margin-bottom: 56px; scroll-margin-top: 20px; }
+  h2 {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin: 0 0 4px;
+  }
+  h2 .num { color: var(--accent); margin-right: 8px; }
+  h3.section-title {
+    font-size: 22px;
+    font-weight: 700;
+    margin: 0 0 20px;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+  h4 {
+    font-size: 15.5px;
+    font-weight: 700;
+    margin: 28px 0 10px;
+  }
+  p { margin: 0 0 14px; max-width: 74ch; }
+  ul, ol { max-width: 72ch; padding-left: 22px; margin: 0 0 16px; }
+  li { margin-bottom: 6px; }
+  strong { font-weight: 650; }
+  code {
+    font-family: var(--mono);
+    font-size: 0.88em;
+    background: var(--accent-soft);
+    color: var(--accent-text);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+
+  /* ── Callouts ────────────────────────────────────────────────────────── */
+  .callout {
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--border-strong);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 18px 0;
+    font-size: 14px;
+    background: var(--bg-raised);
+  }
+  .callout.good { border-left-color: var(--good); background: var(--good-soft); }
+  .callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+  .callout.critical { border-left-color: var(--critical); background: var(--critical-soft); }
+  .callout .label {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 6px;
+    opacity: 0.85;
+  }
+  .callout.good .label { color: var(--good); }
+  .callout.warn .label { color: var(--warn); }
+  .callout.critical .label { color: var(--critical); }
+  .callout p:last-child { margin-bottom: 0; }
+
+  /* ── Tables ──────────────────────────────────────────────────────────── */
+  .table-wrap { overflow-x: auto; margin: 18px 0; border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow); }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; background: var(--bg-raised); }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    background: var(--accent-soft);
+    white-space: nowrap;
+  }
+  tr:last-child td { border-bottom: none; }
+  td code { white-space: nowrap; }
+  .tag {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    padding: 2px 7px;
+    border-radius: 100px;
+    font-weight: 600;
+    display: inline-block;
+    white-space: nowrap;
+  }
+  .tag.reuso { background: var(--good-soft); color: var(--good); }
+  .tag.novo { background: var(--accent-soft); color: var(--accent-text); }
+  .tag.risco { background: var(--warn-soft); color: var(--warn); }
+  .tag.critico { background: var(--critical-soft); color: var(--critical); }
+
+  /* ── Schema blocks ───────────────────────────────────────────────────── */
+  .schema {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.7;
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    overflow-x: auto;
+    white-space: pre;
+    box-shadow: var(--shadow);
+    margin: 14px 0;
+  }
+  .schema .kw { color: var(--accent-text); }
+  .schema .com { color: var(--text-faint); font-style: italic; }
+  .schema .tbl { color: var(--good); font-weight: 700; }
+
+  /* ── Mermaid ─────────────────────────────────────────────────────────── */
+  .diagram {
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px;
+    margin: 18px 0;
+    overflow-x: auto;
+    box-shadow: var(--shadow);
+  }
+
+  /* ── Sprint cards ────────────────────────────────────────────────────── */
+  .sprint {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 22px;
+    margin-bottom: 16px;
+    background: var(--bg-raised);
+    box-shadow: var(--shadow);
+  }
+  .sprint-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; flex-wrap: wrap; }
+  .sprint-id { font-family: var(--mono); font-weight: 700; color: var(--accent); font-size: 13px; }
+  .sprint-title { font-weight: 700; font-size: 15.5px; }
+  .sprint-goal { color: var(--text-muted); font-size: 13.5px; margin-bottom: 12px; }
+  .sprint ul { margin-bottom: 0; font-size: 13.5px; }
+
+  /* ── Misc ────────────────────────────────────────────────────────────── */
+  hr.div { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+  .foot {
+    margin-top: 64px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--text-faint);
+  }
+  a { color: var(--accent); }
+</style>
+
+<div class="wrap">
+
+<header class="doc-head">
+  <span class="eyebrow">Documento técnico · para aprovação</span>
+  <h1>Módulo Serviços Técnicos</h1>
+  <p class="subtitle">Due diligence de arquitetura — auditoria do ObraFlow existente, modelo de dados proposto, plano de sprints. Nenhum código foi alterado para produzir este documento.</p>
+  <div class="meta-row">
+    <span><strong>Sistema:</strong> ObraFlow</span>
+    <span><strong>Sprint alvo:</strong> 13.x</span>
+    <span><strong>Status:</strong> aguardando aprovação</span>
+  </div>
+</header>
+
+<nav class="toc">
+  <p>Sumário</p>
+  <ol>
+    <li><a href="#contexto">Contexto e objetivo</a></li>
+    <li><a href="#auditoria">Auditoria da arquitetura atual</a></li>
+    <li><a href="#arquitetura">Arquitetura proposta</a></li>
+    <li><a href="#fluxo">Fluxograma do módulo</a></li>
+    <li><a href="#dados">Modelo de banco de dados</a></li>
+    <li><a href="#reuso">Reaproveitamento de código</a></li>
+    <li><a href="#novos">Componentes novos</a></li>
+    <li><a href="#impactos">Impacto por área</a></li>
+    <li><a href="#riscos">Riscos técnicos</a></li>
+    <li><a href="#decisoes">Decisões em aberto</a></li>
+    <li><a href="#sprints">Plano de sprints</a></li>
+    <li><a href="#escala">Estratégia de escalabilidade</a></li>
+  </ol>
+</nav>
+
+<section id="contexto">
+  <h2><span class="num">01</span>Seção</h2>
+  <h3 class="section-title">Contexto e objetivo</h3>
+  <p>
+    O ObraFlow hoje resolve um problema específico: gestão de obras financiadas pela Caixa, do lead até a entrega.
+    A Concretize também vende <strong>serviços técnicos independentes</strong> (projetos, laudos, regularização,
+    consultorias) que hoje não têm lugar nenhum no sistema — ficam fora do controle de pipeline, financeiro,
+    documentos e prazos que o resto do ObraFlow já garante.
+  </p>
+  <p>
+    O objetivo deste documento é definir, <strong>antes de escrever qualquer código</strong>, como um módulo
+    "Serviços Técnicos" entra no sistema sem:
+  </p>
+  <ul>
+    <li>alterar o funcionamento de Comercial/Obras/Financeiro existentes;</li>
+    <li>duplicar tabelas, componentes ou lógica que já existem;</li>
+    <li>criar um sistema paralelo desconectado — precisa herdar RBAC, Alertas, Documentos e Financeiro do mesmo jeito que Obras já faz.</li>
+  </ul>
+  <div class="callout good">
+    <span class="label">Decisão já confirmada com você</span>
+    <p>Obra e Serviço ficam como <strong>módulos irmãos</strong> — nenhuma refatoração da tabela <code>obras</code>.
+    O que os conecta é só um <code>cliente</code> compartilhado, para histórico e LTV.</p>
+  </div>
+</section>
+
+<section id="auditoria">
+  <h2><span class="num">02</span>Seção</h2>
+  <h3 class="section-title">Auditoria da arquitetura atual</h3>
+  <p>Fatos confirmados lendo o código e o banco reais (não suposição) — é a base de tudo que vem depois.</p>
+
+  <h4>Multi-tenant e RBAC</h4>
+  <p>
+    Isolamento por <code>workspace_id</code> + RLS em toda tabela, e uma segunda camada de permissão por cargo:
+    <code>has_permission(setor, ação)</code>, checada tanto no banco (RLS) quanto na tela. Os setores hoje são um
+    <code>CHECK</code> fixo de 5 valores: <code>comercial</code>, <code>obras</code>, <code>financeiro</code>,
+    <code>notificacoes</code>, <code>configuracoes</code>. Adicionar <code>servicos_tecnicos</code> é uma migration
+    pequena e mecânica — o padrão já existe, só precisa de mais uma linha na matriz de cargos.
+  </p>
+
+  <h4>Cliente — o gap central</h4>
+  <div class="callout critical">
+    <span class="label">Achado mais importante do documento</span>
+    <p>
+      Não existe tabela <code>clientes</code>. <code>leads</code> e <code>obras</code> guardam nome/CPF/telefone/e-mail
+      <strong>duplicados em cada linha</strong>. Hoje o sistema não sabe se "José Silva" do lead de 2024 é a mesma
+      pessoa do lead de 2025 — não há chave nenhuma ligando os dois. LTV e recorrência, do jeito que você pediu, não
+      existem hoje <strong>nem para Obras</strong>. É a fundação que falta antes de Serviços Técnicos fazer sentido.
+    </p>
+  </div>
+
+  <h4>Financeiro</h4>
+  <p>
+    <code>lancamentos</code> tem <code>obra_id</code> nullable — hoje é a única origem possível de um lançamento.
+    O motor inteiro (DRE, contas bancárias, Recebimentos, Cronograma Financeiro, Orçado × Realizado, Fluxo de Caixa,
+    relatórios em PDF) foi construído na Sprint 12 pensando em "obra", mas a lógica em si — <code>calcularVisaoGeralObra</code>,
+    <code>calcularCronogramaMensal</code>, <code>calcularFluxoCaixaPeriodo</code> — recebe uma lista de lançamentos e um
+    objeto com <code>valor_venda</code>/<code>lucro_previsto_pct</code>/<code>cronograma_financeiro</code>. Não está
+    amarrada ao formato exato de <code>Obra</code> por acidente de código, mas também não está formalmente desacoplada
+    ainda — vale revisar ao implementar.
+  </p>
+
+  <h4>Documentos (Storage híbrido)</h4>
+  <p>
+    <code>documentos</code> e <code>entity_storage_folders</code> já usam <code>entidade_tipo</code> +
+    <code>entidade_id</code> como texto livre, não enum. A estrutura de pastas do Google Drive
+    (<code>folderStructure.ts</code>) já segue o mesmo padrão: toda pasta é <code>find-or-create</code> idempotente
+    por uma <code>chave</code> string (ex: <code>lead:&lt;id&gt;</code>, <code>obra:&lt;id&gt;</code>). Adicionar
+    <code>servico:&lt;id&gt;</code> é literalmente a mesma função, com uma chave nova — não é retrabalho, é reuso direto.
+  </p>
+
+  <h4>Google Agenda</h4>
+  <div class="callout warn">
+    <span class="label">Realidade, não aspiração</span>
+    <p>
+      A integração OAuth com Google Calendar existe e funciona (conectar conta, refresh de token). Mas a criação de
+      evento em si (<code>criarEventoReuniao</code>) está <strong>propositalmente não implementada</strong> — lança
+      erro "ainda não implementada" no código atual. Isso não é uma lacuna exclusiva de Serviços Técnicos: Obras e
+      Comercial também não têm isso funcionando hoje. Não vou prometer Agenda automática no MVP deste módulo.
+    </p>
+  </div>
+
+  <h4>Histórico</h4>
+  <p>
+    A tabela <code>historico</code> já tem <code>lead_id</code>/<code>obra_id</code> nullable e um <code>tipo</code>
+    (<code>lead | comercial | obras | documento | medicao | sistema</code>) — precisa de <code>servico_id</code> novo
+    e um valor <code>servico</code> no <code>tipo</code>. O componente <code>AbaHistorico.tsx</code> já é genérico
+    (recebe <code>leadId</code>/<code>obraId</code> opcionais) — só precisa aceitar <code>servicoId</code> também.
+  </p>
+
+  <h4>Alertas</h4>
+  <p>
+    <code>useNotificacoes</code> já foi reescrito na Sprint 12 para agregar múltiplas fontes (leads, obras, lançamentos,
+    recebimentos) numa lista só, com <code>href</code> de ação por alerta. Adicionar uma seção de regras para Serviços
+    Técnicos é o mesmo padrão que já foi usado para Financeiro — não é arquitetura nova.
+  </p>
+</section>
+
+<section id="arquitetura">
+  <h2><span class="num">03</span>Seção</h2>
+  <h3 class="section-title">Arquitetura proposta</h3>
+  <p>Três decisões estruturais sustentam tudo daqui pra frente:</p>
+
+  <h4>1. Cliente único, compartilhado por Obras e Serviços Técnicos</h4>
+  <p>
+    Nova tabela <code>clientes</code>, identificada por CPF/CNPJ único por workspace. <code>leads</code> e
+    <code>obras</code> ganham <code>cliente_id</code> (nullable no início, preenchido por uma migração de dados).
+    <code>servicos</code> (a tabela nova) referencia o mesmo <code>cliente_id</code> desde o dia 1. Isso é o que
+    permite: puxar dados pelo CPF, ver histórico cruzado, e calcular LTV.
+  </p>
+
+  <h4>2. Obra e Serviço continuam módulos irmãos</h4>
+  <p>
+    Nenhuma tabela existente é renomeada ou refatorada. <code>servicos</code> é uma tabela nova, com seu próprio
+    pipeline, sem herdar de <code>obras</code>. O único ponto de contato estrutural é <code>cliente_id</code>.
+  </p>
+
+  <h4>3. Financeiro compartilha o motor, mas os números nunca se misturam</h4>
+  <p>
+    <code>lancamentos</code> ganha uma coluna <code>servico_id</code> (nullable), irmã de <code>obra_id</code>. Um
+    lançamento pertence a uma obra <strong>ou</strong> a um serviço (nunca os dois) — a mesma regra de
+    <code>CHECK</code> que protege <code>recebimentos.origem_tipo</code> hoje. As telas de Financeiro de Serviços
+    Técnicos usam as <strong>mesmas funções</strong> de cálculo já existentes, só filtrando por <code>servico_id</code>
+    em vez de <code>obra_id</code>.
+  </p>
+  <div class="callout critical">
+    <span class="label">Confirmado — reaproveitar estrutura ≠ misturar valores</span>
+    <p>
+      A maioria das construtoras separa o financeiro de obras financiadas do financeiro de serviços técnicos, e o
+      ObraFlow segue essa regra à risca: <strong>nenhum total, KPI ou relatório soma <code>obra_id</code> e
+      <code>servico_id</code> juntos.</strong> DRE, Fluxo de Caixa, Visão Geral — cada tela do módulo de Serviços
+      Técnicos filtra exclusivamente por <code>servico_id</code>; o Financeiro de Obras continua vendo exatamente o
+      que via antes, sem nenhum lançamento de serviço aparecendo lá. Reaproveitar código não significa unificar
+      número — são dois filtros diferentes sobre a mesma tabela, nunca uma soma conjunta.
+    </p>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Conceito</th><th>Obras</th><th>Serviços Técnicos</th><th>Compartilhado?</th></tr></thead>
+      <tbody>
+        <tr><td>Cliente</td><td><code>clientes</code></td><td><code>clientes</code></td><td><span class="tag reuso">mesma tabela</span></td></tr>
+        <tr><td>Pipeline</td><td><code>leads</code> / <code>obras</code></td><td><code>servicos</code></td><td>tabelas irmãs</td></tr>
+        <tr><td>Financeiro</td><td><code>lancamentos.obra_id</code></td><td><code>lancamentos.servico_id</code></td><td><span class="tag reuso">mesma tabela e motor</span></td></tr>
+        <tr><td>Documentos</td><td><code>documentos.obra_id</code></td><td><code>documentos.servico_id</code></td><td><span class="tag reuso">mesmo componente</span></td></tr>
+        <tr><td>Histórico</td><td><code>historico.obra_id</code></td><td><code>historico.servico_id</code></td><td><span class="tag reuso">mesma tabela e componente</span></td></tr>
+        <tr><td>Alertas</td><td>regras em <code>useNotificacoes</code></td><td>novas regras, mesmo motor</td><td><span class="tag reuso">mesmo hook</span></td></tr>
+        <tr><td>Drive</td><td><code>entity_storage_folders</code> chave <code>obra:&lt;id&gt;</code></td><td>chave <code>servico:&lt;id&gt;</code></td><td><span class="tag reuso">mesma função</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="fluxo">
+  <h2><span class="num">04</span>Seção</h2>
+  <h3 class="section-title">Fluxograma do módulo</h3>
+  <div class="diagram">
+```mermaid
+flowchart TD
+    A["Cliente novo ou existente<br/>(busca por CPF)"] --> B{CPF já<br/>cadastrado?}
+    B -- "Sim" --> C["Autopreenche dados<br/>+ mostra histórico/LTV"]
+    B -- "Não" --> D["Cria registro em clientes"]
+    C --> E
+    D --> E["Novo registro em servicos<br/>vinculado ao catálogo"]
+    E --> F["Pipeline Comercial<br/>Novo Lead → Contato → Proposta →<br/>Negociação → Contrato"]
+    F -- "Proposta" --> G["Indicador + % de indicação<br/>(campo manual)"]
+    F -- "Fechado" --> H["Execução"]
+    H --> I["Gestão de Projetos<br/>Tarefas · Cronograma · Arquivos"]
+    H --> J["Financeiro do Serviço<br/>lancamentos.servico_id"]
+    J -- "parcelas de entrada geradas" --> K["Comissão calculada automático<br/>parcelas de saída espelhadas"]
+    I --> L["Conclusão"]
+    J --> L
+    L --> M["Histórico do Cliente<br/>(1 serviço a mais na linha do tempo)"]
+```
+  </div>
+</section>
+
+<section id="dados">
+  <h2><span class="num">05</span>Seção</h2>
+  <h3 class="section-title">Modelo de banco de dados</h3>
+  <p>Tabelas novas e alterações em tabelas existentes, na ordem em que seriam migradas.</p>
+
+  <h4>Nova: <code>clientes</code></h4>
+  <div class="schema"><span class="com">-- Fundação (Sprint 13.1) — sem isso, nada de LTV/histórico funciona</span>
+<span class="kw">create table</span> <span class="tbl">clientes</span> (
+  id             uuid primary key default gen_random_uuid(),
+  workspace_id   uuid references workspaces(id) on delete cascade,
+  nome           text not null,
+  cpf_cnpj       text,               <span class="com">-- unique(workspace_id, cpf_cnpj) quando preenchido</span>
+  telefone       text,
+  email          text,
+  created_at     timestamptz not null default now(),
+  updated_at     timestamptz not null default now()
+);</div>
+
+  <h4>Alteração: <code>leads</code> e <code>obras</code></h4>
+  <div class="schema"><span class="kw">alter table</span> leads <span class="kw">add column</span> cliente_id uuid <span class="kw">references</span> clientes(id);
+<span class="kw">alter table</span> obras <span class="kw">add column</span> cliente_id uuid <span class="kw">references</span> clientes(id);
+<span class="com">-- backfill: script dry-run casando por CPF, depois --commit (mesmo padrão de sempre)</span></div>
+
+  <h4>Nova: <code>catalogo_servicos</code></h4>
+  <div class="schema"><span class="com">-- O "produto" que a empresa vende — cadastra 1x por tipo de serviço</span>
+<span class="kw">create table</span> <span class="tbl">catalogo_servicos</span> (
+  id                uuid primary key default gen_random_uuid(),
+  workspace_id      uuid references workspaces(id) on delete cascade,
+  categoria         text not null,   <span class="com">-- "Projetos", "Regularização", "Laudos"...</span>
+  nome              text not null,   <span class="com">-- "Projeto Arquitetônico"</span>
+  prazo_medio_dias  integer,
+  preco_sugerido    numeric(12,2),
+  checklist_padrao  jsonb,           <span class="com">-- [{ titulo, ordem }] — semente das tarefas do serviço</span>
+  ativo             boolean not null default true,
+  created_at        timestamptz not null default now()
+);</div>
+
+  <h4>Nova: <code>indicadores</code></h4>
+  <div class="schema"><span class="com">-- Decisão confirmada: cadastro próprio. Não é só corretor — parceiro,</span>
+<span class="com">-- cliente indicando cliente, engenheiro, arquiteto, construtora, contador.</span>
+<span class="kw">create table</span> <span class="tbl">indicadores</span> (
+  id            uuid primary key default gen_random_uuid(),
+  workspace_id  uuid references workspaces(id) on delete cascade,
+  nome          text not null,
+  telefone      text,
+  email         text,
+  tipo          text,     <span class="com">-- livre: "Corretor", "Arquiteto", "Cliente", "Contador"... rótulo, não regra</span>
+  ativo         boolean not null default true,
+  created_at    timestamptz not null default now()
+);</div>
+
+  <h4>Nova: <code>servicos</code> (o pipeline)</h4>
+  <div class="schema"><span class="kw">create table</span> <span class="tbl">servicos</span> (
+  id                  uuid primary key default gen_random_uuid(),
+  workspace_id        uuid references workspaces(id) on delete cascade,
+  cliente_id          uuid not null references clientes(id),
+  catalogo_servico_id uuid references catalogo_servicos(id),
+  nome                text not null,        <span class="com">-- editável — pode divergir do catálogo</span>
+  etapa               text not null default 'novo_lead',
+  valor_proposto       numeric(12,2),
+  indicador_id        uuid references indicadores(id),
+  indicacao_pct       numeric(5,2),
+  responsavel_id       uuid references profiles(id),
+  tarefas              jsonb,                <span class="com">-- [{ titulo, concluida, data_prevista, ordem }]</span>
+  prazo_previsto       date,
+  obs                  text,
+  created_at           timestamptz not null default now(),
+  updated_at           timestamptz not null default now()
+);
+
+<span class="kw">create table</span> <span class="tbl">servico_log</span> (   <span class="com">-- espelha obra_log/lead_log</span>
+  id           uuid primary key default gen_random_uuid(),
+  servico_id   uuid not null references servicos(id) on delete cascade,
+  etapa        text not null,
+  created_at   timestamptz not null default now(),
+  user_id      uuid references profiles(id)
+);</div>
+
+  <h4>Alteração: <code>lancamentos</code>, <code>documentos</code>, <code>historico</code></h4>
+  <div class="schema"><span class="kw">alter table</span> lancamentos <span class="kw">add column</span> servico_id uuid <span class="kw">references</span> servicos(id) <span class="kw">on delete set null</span>;
+<span class="kw">alter table</span> lancamentos <span class="kw">add constraint</span> lancamentos_origem_unica
+  <span class="kw">check</span> (<span class="kw">not</span> (obra_id <span class="kw">is not null and</span> servico_id <span class="kw">is not null</span>));
+
+<span class="kw">alter table</span> documentos <span class="kw">add column</span> servico_id uuid <span class="kw">references</span> servicos(id);
+<span class="kw">alter table</span> historico   <span class="kw">add column</span> servico_id uuid <span class="kw">references</span> servicos(id);</div>
+
+  <div class="callout good">
+    <span class="label">Sobre Tarefas e Cronograma no mesmo campo</span>
+    <p>
+      Você pediu abas separadas de <strong>Tarefas</strong> e <strong>Cronograma</strong> dentro do modal do
+      serviço. Em vez de duas fontes de dado (risco de ficarem dessincronizadas), as duas abas leem o mesmo
+      <code>servicos.tarefas</code> (jsonb) — Tarefas mostra como checklist, Cronograma mostra a mesma lista como
+      linha do tempo por <code>data_prevista</code>. Mesmo padrão já usado em <code>obras.composicao_custos</code> e
+      <code>obras.cronograma_financeiro</code> na Sprint 12 — não precisa de tabela própria.
+    </p>
+  </div>
+</section>
+
+<section id="reuso">
+  <h2><span class="num">06</span>Seção</h2>
+  <h3 class="section-title">Reaproveitamento de código existente</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Necessidade</th><th>Componente/função já existente</th><th>Mudança necessária</th></tr></thead>
+      <tbody>
+        <tr><td>Pipeline Kanban</td><td><code>Pipeline.tsx</code> (Comercial)</td><td>generalizar props de <code>Lead</code> para um tipo mais genérico, ou duplicar a casca visual (mesmo padrão do "+"-quick-add já usado no projeto)</td></tr>
+        <tr><td>Documentos + Drive</td><td><code>AbaDocumentos.tsx</code>, <code>folderStructure.ts</code></td><td>aceitar <code>servicoId</code>; nova função <code>ensureServicoFolder</code> espelhando <code>ensureObraPuraFolder</code></td></tr>
+        <tr><td>Histórico</td><td><code>AbaHistorico.tsx</code>, <code>historico.service.ts</code></td><td>aceitar <code>servicoId</code></td></tr>
+        <tr><td>Financeiro (Visão Geral, Fluxo de Caixa, Lançamentos, PDF)</td><td><code>calcularVisaoGeralObra</code>, <code>calcularFluxoCaixaPeriodo</code>, geradores de PDF</td><td>generalizar assinatura para receber <code>{ valor_venda, ... }</code> de <code>Obra</code> <em>ou</em> <code>Servico</code> — ou aceitar os dois tipos via union</td></tr>
+        <tr><td>Alertas</td><td><code>useNotificacoes</code></td><td>novo bloco de regras (mesmo padrão dos blocos de Obras/Financeiro já existentes)</td></tr>
+        <tr><td>RBAC</td><td><code>has_permission()</code>, <code>cargos</code>/<code>permissoes_cargo</code></td><td>adicionar <code>servicos_tecnicos</code> na lista de setores + seed na matriz padrão</td></tr>
+        <tr><td>"+"-quick-add (Indicador)</td><td>padrão já usado em Correspondente/Corretor/Cidade/Conta Bancária</td><td>replicar o mesmo padrão (ver decisão em aberto)</td></tr>
+        <tr><td>Busca por CPF + autopreenchimento</td><td>nenhum hoje</td><td><span class="tag novo">novo</span> — mas pequeno: 1 query + preencher form</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="novos">
+  <h2><span class="num">07</span>Seção</h2>
+  <h3 class="section-title">Componentes novos necessários</h3>
+  <ul>
+    <li><strong><code>ModalCliente.tsx</code></strong> — cadastro (nome/CPF/telefone/email) + aba Histórico de Movimentações (junta <code>obra_log</code>/<code>servico_log</code>/<code>historico</code> de todas as obras e serviços daquele cliente numa linha do tempo só).</li>
+    <li><strong><code>SetorServicosTecnicos.tsx</code></strong> — casca do módulo com os 4 sub-módulos (Comercial / Gestão de Projetos / Equipe / Financeiro), no mesmo formato de <code>SetorObras.tsx</code>.</li>
+    <li><strong><code>ModalServico.tsx</code></strong> — o modal principal, 7 abas: <strong>Geral · Orçamento · Tarefas · Cronograma · Financeiro · Arquivos · Histórico</strong>. Estrutura de abas é uma cópia direta do padrão já usado em <code>ModalObra.tsx</code> — mesmo componente <code>Modal</code>/<code>ModalHeader</code>, mesma lógica de tabs.</li>
+    <li><strong><code>catalogo-servicos.service.ts</code> / tela de cadastro</strong> — CRUD simples do catálogo (Configurações ou dentro do próprio módulo).</li>
+    <li><strong>Componente "Indicador"</strong> (select + quick-add) — depende da decisão em aberto abaixo.</li>
+  </ul>
+</section>
+
+<section id="impactos">
+  <h2><span class="num">08</span>Seção</h2>
+  <h3 class="section-title">Impacto por área</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Área</th><th>Impacto</th><th>Tamanho</th></tr></thead>
+      <tbody>
+        <tr><td>Migrations</td><td>1 tabela nova pequena (<code>clientes</code>), 1 backfill, 2 tabelas de pipeline (<code>catalogo_servicos</code>, <code>servicos</code> + <code>servico_log</code>), 3 colunas novas em tabelas existentes (<code>lancamentos</code>, <code>documentos</code>, <code>historico</code>)</td><td><span class="tag reuso">pequeno-médio</span></td></tr>
+        <tr><td>RBAC</td><td>1 setor novo no CHECK + seed de permissão padrão nos 6 cargos existentes</td><td><span class="tag reuso">pequeno</span></td></tr>
+        <tr><td>Histórico</td><td>coluna nova + 1 valor novo de <code>tipo</code>; componente já é genérico</td><td><span class="tag reuso">pequeno</span></td></tr>
+        <tr><td>Financeiro</td><td>maior ponto de atenção — reaproveitar sem quebrar Obras exige generalizar as funções de cálculo com cuidado</td><td><span class="tag risco">médio, precisa de teste</span></td></tr>
+        <tr><td>Google Drive</td><td>1 função nova (espelha existente), 1 categoria raiz nova no Drive (<code>4.0_SERVICOS_TECNICOS</code>)</td><td><span class="tag reuso">pequeno</span></td></tr>
+        <tr><td>Google Agenda</td><td>nenhum — a integração não cria eventos hoje pra nenhum módulo; não é regressão, é limitação pré-existente</td><td><span class="tag reuso">sem impacto</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="riscos">
+  <h2><span class="num">09</span>Seção</h2>
+  <h3 class="section-title">Riscos técnicos</h3>
+
+  <div class="callout warn">
+    <span class="label">Risco 1 — generalizar o motor financeiro sem quebrar Obras</span>
+    <p>
+      As funções de <code>cronogramaFinanceiro.ts</code> e <code>visaoGeralObra.ts</code> hoje recebem o tipo
+      <code>Obra</code> diretamente. Generalizar para aceitar <code>Servico</code> também exige ou (a) uma interface
+      comum mínima (<code>{ valor_venda, lucro_previsto_pct, cronograma_financeiro, data_inicio }</code>) que os dois
+      tipos implementam, ou (b) duas cópias paralelas. Vou de (a) — mas é o ponto que mais precisa de teste antes de
+      dar como pronto, porque um erro aqui afeta o Financeiro de Obras que já está em produção com dados reais.
+    </p>
+  </div>
+
+  <div class="callout good">
+    <span class="label">Risco 2 — resolvido: regra de matching confirmada</span>
+    <p>
+      Nem todo lead/obra tem CPF preenchido hoje (confirmamos isso na sessão de import do Comercial). Regra fechada:
+      só ligo lead/obra a um cliente já existente quando <strong>CPF, e-mail ou telefone realmente baterem</strong>.
+      Sem nenhum desses três preenchidos, o backfill cria um cliente novo e separado — <strong>nunca força um match
+      arriscado, e nunca altera um cliente que já existe</strong>. Se no futuro descobrirem que dois clientes são a
+      mesma pessoa (CPF preenchido depois, por exemplo), a unificação é manual, avisando que já existe um cadastro.
+      Dry-run obrigatório antes de qualquer <code>--commit</code>, mesmo padrão desta sessão inteira.
+    </p>
+  </div>
+
+  <div class="callout critical">
+    <span class="label">Risco 3 — comissão automática mexe com dinheiro real</span>
+    <p>
+      A geração automática de parcelas de saída (comissão) precisa ser <strong>revisável antes de virar lançamento
+      pago</strong> — nunca criar uma saída já como "pago" sem confirmação humana. Sugiro nascer como
+      <code>pendente</code> sempre, e o usuário confirma o pagamento manualmente (mesmo modelo que já existe pra
+      qualquer saída no Financeiro).
+    </p>
+  </div>
+
+  <div class="callout">
+    <span class="label">Risco 4 — Pipeline duplicado visualmente, mas não em dado</span>
+    <p>
+      Comercial de Obras e Comercial de Serviços Técnicos vão parecer telas gêmeas (Kanban, etapas). Risco real:
+      alguém copiar/colar o componente inteiro e criar 2 fontes de verdade de UI que divergem com o tempo. Mitigação:
+      extrair a casca do Kanban (arrastar card, colunas por etapa) como componente compartilhado desde o início,
+      mesmo que o conteúdo do card seja diferente.
+    </p>
+  </div>
+</section>
+
+<section id="decisoes">
+  <h2><span class="num">10</span>Seção</h2>
+  <h3 class="section-title">Decisões — confirmadas e em aberto</h3>
+
+  <div class="callout good">
+    <span class="label">1. Quem pode ser "Indicador" — resolvido</span>
+    <p>
+      <strong>Cadastro próprio</strong> (tabela <code>indicadores</code>, ver modelo de dados). Confirmado: não é só
+      corretor — parceiros, clientes indicando clientes, engenheiros, arquitetos, construtoras e contadores também
+      podem indicar. Mesmo padrão "+"-quick-add já usado em Correspondente/Corretor/Conta Bancária.
+    </p>
+  </div>
+
+  <h4>2. Aba "Orçamento" do <code>ModalServico</code> — o que exatamente mostra?</h4>
+  <p>
+    Posso tratar como uma versão simplificada do "Orçado × Realizado" que já existe em Obras (valor proposto vs.
+    total já lançado no Financeiro do serviço), sem cronograma mensal — já que serviço técnico não tem liberação
+    financiada mês a mês como uma obra pela Caixa. Confirma essa leitura?
+  </p>
+</section>
+
+<section id="sprints">
+  <h2><span class="num">11</span>Seção</h2>
+  <h3 class="section-title">Plano de sprints</h3>
+
+  <div class="sprint">
+    <div class="sprint-head"><span class="sprint-id">Sprint 13.1</span><span class="sprint-title">Fundação — Cliente Único</span></div>
+    <p class="sprint-goal">Sem isso, nada do resto faz sentido. Entrega valor mesmo antes do módulo novo existir.</p>
+    <ul>
+      <li>Migration <code>clientes</code> + <code>leads.cliente_id</code> + <code>obras.cliente_id</code></li>
+      <li>Script de backfill (dry-run → confirmação → commit)</li>
+      <li>Busca por CPF com autopreenchimento no formulário de Lead (Obras)</li>
+      <li><code>ModalCliente.tsx</code> com aba Histórico de Movimentações (só com dados de Obras por enquanto)</li>
+    </ul>
+  </div>
+
+  <div class="sprint">
+    <div class="sprint-head"><span class="sprint-id">Sprint 13.2</span><span class="sprint-title">RBAC + esqueleto do módulo</span></div>
+    <ul>
+      <li>Setor <code>servicos_tecnicos</code> no RBAC + seed nos cargos padrão</li>
+      <li>Item de menu + rota <code>/servicos-tecnicos</code> com os 4 sub-módulos (cascas vazias)</li>
+      <li><code>catalogo_servicos</code> (tabela + tela de cadastro simples)</li>
+    </ul>
+  </div>
+
+  <div class="sprint">
+    <div class="sprint-head"><span class="sprint-id">Sprint 13.3</span><span class="sprint-title">Comercial de Serviços Técnicos</span></div>
+    <ul>
+      <li><code>servicos</code> + <code>servico_log</code></li>
+      <li>Pipeline Kanban (Novo Lead → Contato → Proposta → Negociação → Contrato → Execução → Concluído)</li>
+      <li>Campo Indicador + % na Proposta (resolvendo a decisão em aberto #1)</li>
+    </ul>
+  </div>
+
+  <div class="sprint">
+    <div class="sprint-head"><span class="sprint-id">Sprint 13.4</span><span class="sprint-title">Gestão de Projetos</span></div>
+    <ul>
+      <li><code>ModalServico.tsx</code> — abas Geral, Tarefas, Cronograma, Arquivos, Histórico</li>
+      <li>Checklist a partir do catálogo (<code>servicos.tarefas</code>)</li>
+      <li>Drive: <code>ensureServicoFolder</code> + categoria raiz nova</li>
+    </ul>
+  </div>
+
+  <div class="sprint">
+    <div class="sprint-head"><span class="sprint-id">Sprint 13.5</span><span class="sprint-title">Financeiro de Serviços Técnicos + Comissão</span></div>
+    <ul>
+      <li><code>lancamentos.servico_id</code> + generalização das funções de cálculo (Risco 1 — testar contra dados reais de Obras antes de fechar)</li>
+      <li>Abas Orçamento e Financeiro do <code>ModalServico</code></li>
+      <li>Geração automática de parcelas de comissão (sempre nascendo <code>pendente</code>)</li>
+    </ul>
+  </div>
+
+  <div class="sprint">
+    <div class="sprint-head"><span class="sprint-id">Sprint 13.6</span><span class="sprint-title">Equipe + Alertas</span></div>
+    <ul>
+      <li>Sub-módulo Equipe (responsável por serviço)</li>
+      <li>Regras novas em <code>useNotificacoes</code>: serviço atrasado, tarefa vencida, comissão pendente</li>
+      <li>Relatório em PDF do serviço (reaproveitando <code>RelatorioBase.tsx</code>)</li>
+    </ul>
+  </div>
+</section>
+
+<section id="escala">
+  <h2><span class="num">12</span>Seção</h2>
+  <h3 class="section-title">Estratégia de escalabilidade e desacoplamento</h3>
+  <ul>
+    <li><strong>Catálogo, não código.</strong> Um serviço novo (ex: "Energia Solar") é uma linha em <code>catalogo_servicos</code>, nunca uma tabela ou tela nova.</li>
+    <li><strong>Chave string para Drive/Storage</strong>, não enum — já é assim hoje, continua sendo.</li>
+    <li><strong>Uma função de cálculo, dois chamadores</strong> — Financeiro de Obra e de Serviço usam a mesma lógica, nunca cópias que podem divergir.</li>
+    <li><strong>Uma fonte de dado por informação</strong> — Tarefas e Cronograma leem o mesmo <code>jsonb</code>, Histórico do Cliente lê as tabelas de log existentes, nunca uma tabela-resumo redundante.</li>
+    <li><strong>RBAC e Alertas por adição, não por modificação</strong> — cada módulo novo soma uma entrada nos mesmos mecanismos, nunca cria um sistema de permissão ou notificação paralelo.</li>
+  </ul>
+</section>
+
+<div class="foot">ObraFlow · Documento gerado para revisão — nenhuma migration foi executada, nenhum arquivo de produção foi alterado.</div>
+
+</div>

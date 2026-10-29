@@ -40,3 +40,6 @@ yarn-error.log*
 
 # Backups manuais (backup-manual.mjs) — contém dado real de cliente, nunca commitar
 /backups/
+
+# Dados exportados do Notion (contêm dados pessoais de clientes)
+import-data/

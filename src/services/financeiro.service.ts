@@ -4,10 +4,16 @@ import type { Lancamento } from "@/types/app.types";
 
 const supabase = createClient();
 
+// Financeiro de Obras (Dashboard/DRE/Fluxo de Caixa/Por Obra) — exclui
+// lançamentos de Serviços Técnicos explicitamente. Reaproveitar a mesma
+// tabela/engine não pode significar somar os dois financeiros juntos
+// (regra confirmada pelo usuário) — ver lancamentosServico.service.ts pro
+// equivalente do lado de Serviços Técnicos.
 export async function getLancamentos(): Promise<Lancamento[]> {
   const { data, error } = await supabase
     .from("lancamentos")
     .select("*")
+    .is("servico_id", null)
     .order("data", { ascending: false });
   if (error) throw error;
   return (data ?? []) as Lancamento[];

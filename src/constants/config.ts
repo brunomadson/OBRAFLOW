@@ -22,6 +22,11 @@ export const CONFIG_PADRAO: ConfigPrazos = {
   pagamento_apos_laudo_alerta:     4,
   pagamento_dias_uteis:            5,
   pagamento_alerta_dias_uteis:     4,
+  recebimento_pendente_alerta_dias: 3,
+  recebimento_pendente_critico_dias: 7,
+  obra_sem_movimentacao_dias:      15,
+  caixa_minimo:                    null,
+  servico_sem_movimentacao_dias:   15,
 };
 
 export const GRUPOS_CONFIG = [
@@ -82,6 +87,29 @@ export const GRUPOS_CONFIG = [
       { key: "laudo_apos_solicitada_dias",   label: "Prazo — Laudo após Solicitada",         desc: "Dias após medição 'Solicitada' para laudo emitido.",         unidade: "dias" },
       { key: "pagamento_apos_laudo_dias",    label: "Prazo — Pagamento após laudo",          desc: "Dias para liberação do pagamento após laudo emitido.",       unidade: "dias" },
       { key: "pagamento_apos_laudo_alerta",  label: "Alerta antecipado — Pagamento",         desc: "Dias antes do prazo de pagamento para alerta.",             unidade: "dias" },
+    ],
+  },
+  {
+    id: "financeiro",
+    label: "Financeiro",
+    emoji: "💰",
+    cor: "#059669",
+    itens: [
+      { key: "pagamento_alerta_dias_uteis",         label: "Alerta — Conta a vencer",       desc: "Dias úteis antes do vencimento de uma saída para disparar alerta.", unidade: "dias úteis" },
+      { key: "pagamento_dias_uteis",                label: "Prazo — Conta vencida",         desc: "Dias úteis de tolerância antes de marcar uma saída como vencida.",  unidade: "dias úteis" },
+      { key: "recebimento_pendente_alerta_dias",    label: "Alerta — Recebimento pendente", desc: "Dias após a Caixa liberar uma medição sem repasse do cliente para alerta.", unidade: "dias" },
+      { key: "recebimento_pendente_critico_dias",   label: "Crítico — Recebimento pendente",desc: "Dias sem repasse do cliente para virar crítico.",                  unidade: "dias" },
+      { key: "obra_sem_movimentacao_dias",          label: "Obra sem movimentação",         desc: "Dias sem nenhum lançamento ou medição para alertar.",              unidade: "dias" },
+      { key: "caixa_minimo",                        label: "Caixa mínimo (opcional)",        desc: "Alerta se o saldo total da empresa cair abaixo desse valor. Deixe 0 para desativar.", unidade: "R$" },
+    ],
+  },
+  {
+    id: "servicos_tecnicos",
+    label: "Serviços Técnicos",
+    emoji: "🛠",
+    cor: "#EC4899",
+    itens: [
+      { key: "servico_sem_movimentacao_dias", label: "Serviço sem movimentação", desc: "Dias sem avançar de etapa nem concluir tarefa para alertar.", unidade: "dias" },
     ],
   },
 ];

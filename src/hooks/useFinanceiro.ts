@@ -66,6 +66,13 @@ export function useFinanceiro() {
     }
   }, []);
 
+  // Insere um lançamento já criado em outro lugar (ex: Recebimentos, que
+  // cria o lançamento por baixo dos panos) direto no estado local — sem
+  // isso, essa tela só saberia do lançamento novo depois de um reload().
+  const adicionarLocal = useCallback((lancamento: Lancamento) => {
+    setLancamentos((p) => [lancamento, ...p]);
+  }, []);
+
   const remover = useCallback(async (id: string): Promise<void> => {
     try {
       await deleteLancamento(id);
@@ -76,5 +83,5 @@ export function useFinanceiro() {
     }
   }, []);
 
-  return { lancamentos, loading, criar, criarVarios, editar, pagar, remover, reload: load };
+  return { lancamentos, loading, criar, criarVarios, editar, pagar, remover, adicionarLocal, reload: load };
 }

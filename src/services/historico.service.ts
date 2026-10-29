@@ -7,15 +7,18 @@ const supabase = createClient();
 export async function getHistorico(params: {
   lead_id?: string;
   obra_id?: string;
+  servico_id?: string;
 }): Promise<Historico[]> {
-  const { lead_id, obra_id } = params;
+  const { lead_id, obra_id, servico_id } = params;
 
   let query = supabase
     .from("historico")
     .select("*")
     .order("created_at", { ascending: false });
 
-  if (lead_id && obra_id) {
+  if (servico_id) {
+    query = query.eq("servico_id", servico_id);
+  } else if (lead_id && obra_id) {
     query = query.or(`lead_id.eq.${lead_id},obra_id.eq.${obra_id}`);
   } else if (lead_id) {
     query = query.eq("lead_id", lead_id);

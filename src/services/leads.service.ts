@@ -50,6 +50,18 @@ export async function updateLead(id: string, payload: Partial<Lead>): Promise<Le
   return data as unknown as Lead;
 }
 
+// Histórico do Cliente (Sprint 13.1) — todos os leads já vinculados a esse
+// cliente_id, independente da etapa.
+export async function getLeadsPorCliente(clienteId: string): Promise<Lead[]> {
+  const { data, error } = await supabase
+    .from("leads")
+    .select("id, nome, etapa, created_at")
+    .eq("cliente_id", clienteId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as unknown as Lead[];
+}
+
 export async function registrarLogLead(
   leadId: string,
   etapa: string,

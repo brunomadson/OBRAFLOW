@@ -50,7 +50,7 @@ export function useLeads() {
         const atualizado = await updateLead(lead.id, lead);
         setLeads((prev) => prev.map((l) => (l.id === atualizado.id ? { ...l, ...atualizado } : l)));
         await registrarHistorico({
-          lead_id: lead.id, obra_id: null,
+          lead_id: lead.id, obra_id: null, servico_id: null,
           tipo: "comercial", acao: "editou as informações do cliente.",
           usuario_nome: nomeUsuario, usuario_id: null, setor: "comercial", etapa: lead.etapa ?? null,
         }).catch(() => {});
@@ -60,7 +60,7 @@ export function useLeads() {
         const novo = await createLead(lead as never);
         await registrarLogLead(novo.id, "leads");
         await registrarHistorico({
-          lead_id: novo.id, obra_id: null,
+          lead_id: novo.id, obra_id: null, servico_id: null,
           tipo: "lead", acao: "criou o Lead.",
           usuario_nome: nomeUsuario, usuario_id: null, setor: "comercial", etapa: "leads",
         }).catch(() => {});
@@ -93,7 +93,7 @@ export function useLeads() {
           ? `moveu o cliente de "${labelEtapaLead(etapaAnterior)}" para "${labelEtapaLead(novaEtapa)}".`
           : `moveu o cliente para "${labelEtapaLead(novaEtapa)}".`;
         await registrarHistorico({
-          lead_id: leadId, obra_id: null,
+          lead_id: leadId, obra_id: null, servico_id: null,
           tipo: "comercial", acao: acaoText,
           usuario_nome: nomeUsuario, usuario_id: null, setor: "comercial", etapa: novaEtapa,
         }).catch(() => {});
@@ -142,6 +142,7 @@ export function useLeads() {
         valor_lote: lead.valor_lote ?? undefined,
         valor_subsidio: lead.valor_subsidio ?? undefined,
         valor_financiamento: lead.valor_financiamento ?? undefined,
+        recursos_proprios: lead.recursos_proprios ?? undefined,
         correspondente_id: lead.correspondente_id,
         data_contato: lead.data_contato,
         data_reuniao: lead.data_reuniao,
@@ -158,12 +159,12 @@ export function useLeads() {
       // Registra log inicial da etapa "projeto" (trigger só dispara em UPDATE)
       await registrarLogObra(novaObra.id, "projeto").catch(() => {});
       await registrarHistorico({
-        lead_id: leadId, obra_id: novaObra.id,
+        lead_id: leadId, obra_id: novaObra.id, servico_id: null,
         tipo: "comercial", acao: "enviou o cliente para o setor Obras.",
         usuario_nome: nomeUsuario, usuario_id: null, setor: "comercial", etapa: "aprovada",
       }).catch(() => {});
       await registrarHistorico({
-        lead_id: leadId, obra_id: novaObra.id,
+        lead_id: leadId, obra_id: novaObra.id, servico_id: null,
         tipo: "obras", acao: "cliente chegou ao setor Obras na etapa Projeto.",
         usuario_nome: "Sistema", usuario_id: null, setor: "obras", etapa: "projeto",
       }).catch(() => {});

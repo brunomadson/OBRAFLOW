@@ -21,7 +21,14 @@ const NOMES = {
   obras_andamento: "2.2_OBRAS_EM_ANDAMENTO",
   obras_entregues: "2.3_CASAS_ENTREGUES",
   financeiro_root: "3.0_FINANCEIRO",
+  servicos_root: "4.0_SERVICOS_TECNICOS",
 } as const;
+
+// Serviços Técnicos ainda não tem seções fixas tipo Obras (pessoal/projetos/
+// engenharia/contrato — isso é específico do checklist de financiamento
+// Caixa) — a aba Arquivos (Sprint 13.4) é upload livre, então só existe uma
+// subpasta única por enquanto.
+const SERVICO_SUBPASTA = "01_ARQUIVOS";
 
 // secao (AbaDocumentos.tsx) → nome de subpasta dentro da pasta do cliente.
 const SUBPASTA_POR_SECAO: Record<string, string> = {
@@ -108,6 +115,7 @@ export async function ensureRootStructure(ctx: IntegrationContext, accessToken: 
   await ensureFolder(ctx, accessToken, "obras_andamento", NOMES.obras_andamento, null, null, "obras_root");
   await ensureFolder(ctx, accessToken, "obras_entregues", NOMES.obras_entregues, null, null, "obras_root");
   await ensureFolder(ctx, accessToken, "financeiro_root", NOMES.financeiro_root, null, null, "root");
+  await ensureFolder(ctx, accessToken, "servicos_root", NOMES.servicos_root, null, null, "root");
 }
 
 function slugCliente(nome: string, cidade: string | null): string {
@@ -222,6 +230,23 @@ export async function ensureObraPuraFolder(
   }
 }
 
+// Serviço Técnico (Sprint 13.4): pasta do cliente direto dentro de
+// 4.0_SERVICOS_TECNICOS, chave própria "servico:<id>" — nunca cruza com
+// "lead:<id>"/"obra:<id>" mesmo que seja o mesmo cliente (Financeiro
+// separado, Drive segue a mesma regra). Sem "cidade" — clientes (Sprint
+// 13.1) não tem esse campo, então o nome da pasta é só o nome do cliente.
+export async function ensureServicoFolder(
+  ctx: IntegrationContext,
+  accessToken: string,
+  servicoId: string,
+  nomeCliente: string
+): Promise<void> {
+  await ensureRootStructure(ctx, accessToken);
+  const chaveServico = `servico:${servicoId}`;
+  await ensureFolder(ctx, accessToken, chaveServico, slugCliente(nomeCliente, null), "servico", servicoId, "servicos_root");
+  await ensureFolder(ctx, accessToken, `${chaveServico}:arquivos`, SERVICO_SUBPASTA, "servico", servicoId, chaveServico);
+}
+
 // Mapeia a etapa da obra pra qual das 3 categorias de 2.0_OBRAS ela cai.
 // A maior parte das etapas (projeto até contrato) fica em "processos" —
 // só execucao/entregue têm categoria própria, então mudar de etapa DENTRO
@@ -262,8 +287,8 @@ export async function moverObraEtapa(
   await moveDriveItem(accessToken, pasta.external_folder_id, destino.external_folder_id, origem?.external_folder_id ?? destino.external_folder_id);
 }
 
-export function resolveSubpastaChave(params: { leadId?: string | null; obraId?: string | null }, secao: string): string {
-  const base = params.leadId ? `lead:${params.leadId}` : `obra:${params.obraId}`;
+export function resolveSubpastaChave(params: { leadId?: string | null; obraId?: string | null; servicoId?: string | null }, secao: string): string {
+  const base = params.leadId ? `lead:${params.leadId}` : params.obraId ? `obra:${params.obraId}` : `servico:${params.servicoId}`;
   if (secao.startsWith("medicoes_pls_")) {
     const pls = secao.replace("medicoes_pls_", "");
     return `${base}:medicoes:pls_${pls}`;

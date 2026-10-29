@@ -50,7 +50,7 @@ export type Database = {
         Row: {
           id: string;
           cargo_id: string;
-          setor: "comercial" | "obras" | "financeiro" | "notificacoes" | "configuracoes" | "metas" | "membros" | "integracoes" | "documentos";
+          setor: "comercial" | "obras" | "financeiro" | "notificacoes" | "configuracoes" | "metas" | "membros" | "integracoes" | "documentos" | "servicos-tecnicos";
           pode_visualizar: boolean;
           pode_criar: boolean;
           pode_editar: boolean;
@@ -70,6 +70,7 @@ export type Database = {
           origem: string;
           indicado_por: string | null;
           corretor: string | null;
+          corretor_id: string | null;
           renda_bruta: number | null;
           tipo_renda: string | null;
           modalidade: string | null;
@@ -86,11 +87,13 @@ export type Database = {
           valor_lote: number | null;
           valor_subsidio: number | null;
           valor_financiamento: number | null;
+          recursos_proprios: number | null;
           anotacoes: string | null;
           etapa: string;
           enviado_para_obras: boolean;
           data_envio_obras: string | null;
           correspondente_id: string | null;
+          cliente_id: string | null;
           reuniao_agendada: Json | null;
           workspace_id: string | null;
           created_at: string;
@@ -151,6 +154,116 @@ export type Database = {
         Insert: Omit<Database["public"]["Tables"]["correspondentes"]["Row"], "id" | "created_at">;
         Update: Partial<Database["public"]["Tables"]["correspondentes"]["Insert"]>;
       };
+      clientes: {
+        Row: {
+          id: string;
+          nome: string;
+          cpf_cnpj: string | null;
+          telefone: string | null;
+          email: string | null;
+          workspace_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["clientes"]["Row"], "id" | "created_at" | "updated_at">;
+        Update: Partial<Database["public"]["Tables"]["clientes"]["Insert"]>;
+      };
+      catalogo_servicos: {
+        Row: {
+          id: string;
+          nome: string;
+          categoria: string | null;
+          categoria_id: string | null;
+          template_padrao_id: string | null;
+          descricao: string | null;
+          tarefas_padrao: Json;
+          fases_execucao: Json;
+          ativo: boolean;
+          workspace_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["catalogo_servicos"]["Row"], "id" | "created_at" | "updated_at">;
+        Update: Partial<Database["public"]["Tables"]["catalogo_servicos"]["Insert"]>;
+      };
+      categorias_servico: {
+        Row: {
+          id: string;
+          nome: string;
+          ordem: number;
+          ativo: boolean;
+          workspace_id: string | null;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["categorias_servico"]["Row"], "id" | "created_at">;
+        Update: Partial<Database["public"]["Tables"]["categorias_servico"]["Insert"]>;
+      };
+      templates_servico: {
+        Row: {
+          id: string;
+          nome: string;
+          descricao: string | null;
+          fases_execucao: Json;
+          tarefas_padrao: Json;
+          ativo: boolean;
+          workspace_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["templates_servico"]["Row"], "id" | "created_at" | "updated_at">;
+        Update: Partial<Database["public"]["Tables"]["templates_servico"]["Insert"]>;
+      };
+      indicadores: {
+        Row: {
+          id: string;
+          nome: string;
+          telefone: string | null;
+          email: string | null;
+          tipo: string | null;
+          ativo: boolean;
+          workspace_id: string | null;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["indicadores"]["Row"], "id" | "created_at">;
+        Update: Partial<Database["public"]["Tables"]["indicadores"]["Insert"]>;
+      };
+      servicos: {
+        Row: {
+          id: string;
+          cliente_id: string;
+          catalogo_servico_id: string | null;
+          etapa: string;
+          status_execucao: string;
+          valor_proposta: number | null;
+          indicador_id: string | null;
+          indicador_pct: number | null;
+          responsavel_id: string | null;
+          anotacoes: string | null;
+          tarefas: Json;
+          fase_execucao_id: string | null;
+          template_id: string | null;
+          proposta_id: string | null;
+          composicao_custos: Json;
+          cronograma_financeiro: Json;
+          workspace_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["servicos"]["Row"], "id" | "created_at" | "updated_at">;
+        Update: Partial<Database["public"]["Tables"]["servicos"]["Insert"]>;
+      };
+      servico_log: {
+        Row: {
+          id: string;
+          servico_id: string;
+          etapa: string;
+          dados_extras: Json | null;
+          criado_em: string;
+          criado_por: string | null;
+        };
+        Insert: Omit<Database["public"]["Tables"]["servico_log"]["Row"], "id" | "criado_em">;
+        Update: never;
+      };
       contas_bancarias: {
         Row: {
           id: string;
@@ -177,6 +290,8 @@ export type Database = {
           endereco: string | null;
           engenheiro: string | null;
           correspondente_id: string | null;
+          corretor_id: string | null;
+          cliente_id: string | null;
           tamanho_imovel: string | null;
           com_muro: string | null;
           valor_obra: number | null;
@@ -185,6 +300,8 @@ export type Database = {
           valor_lote: number | null;
           valor_subsidio: number | null;
           valor_financiamento: number | null;
+          recursos_proprios: number | null;
+          lucro_previsto_pct: number | null;
           renda_bruta: number | null;
           tipo_renda: string | null;
           dependente: boolean;
@@ -201,6 +318,8 @@ export type Database = {
           licencas: Json;
           eng_caixa: Json;
           conformidade: Json;
+          composicao_custos: Json | null;
+          cronograma_financeiro: Json | null;
           workspace_id: string | null;
           created_at: string;
           updated_at: string;
@@ -241,6 +360,7 @@ export type Database = {
         Row: {
           id: string;
           obra_id: string | null;
+          servico_id: string | null;
           tipo: "entrada" | "saida";
           categoria: string;
           grupo: string | null;
@@ -262,11 +382,30 @@ export type Database = {
         Insert: Omit<Database["public"]["Tables"]["lancamentos"]["Row"], "id" | "created_at">;
         Update: Partial<Database["public"]["Tables"]["lancamentos"]["Insert"]>;
       };
+      recebimentos: {
+        Row: {
+          id: string;
+          workspace_id: string | null;
+          obra_id: string;
+          origem_tipo: "medicao" | "recursos_proprios";
+          medicao_id: string | null;
+          lancamento_id: string | null;
+          valor: number;
+          data: string;
+          forma_pagamento: string | null;
+          obs: string | null;
+          created_at: string;
+          created_by: string | null;
+        };
+        Insert: Omit<Database["public"]["Tables"]["recebimentos"]["Row"], "id" | "created_at">;
+        Update: Partial<Database["public"]["Tables"]["recebimentos"]["Insert"]>;
+      };
       documentos: {
         Row: {
           id: string;
           lead_id: string | null;
           obra_id: string | null;
+          servico_id: string | null;
           secao: string;
           tipo_doc: string;
           nome_arquivo: string;
@@ -317,7 +456,8 @@ export type Database = {
           id: string;
           lead_id: string | null;
           obra_id: string | null;
-          tipo: "lead" | "comercial" | "obras" | "documento" | "medicao" | "sistema";
+          servico_id: string | null;
+          tipo: "lead" | "comercial" | "obras" | "documento" | "medicao" | "sistema" | "servico_tecnico";
           acao: string;
           usuario_id: string | null;
           usuario_nome: string;

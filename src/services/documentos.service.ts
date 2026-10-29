@@ -10,8 +10,9 @@ const supabase = createClient();
 export async function getDocumentos(params: {
   lead_id?: string;
   obra_id?: string;
+  servico_id?: string;
 }): Promise<Documento[]> {
-  const { lead_id, obra_id } = params;
+  const { lead_id, obra_id, servico_id } = params;
 
   let query = supabase
     .from("documentos")
@@ -19,7 +20,9 @@ export async function getDocumentos(params: {
     .eq("ativo", true)
     .order("created_at", { ascending: true });
 
-  if (lead_id && obra_id) {
+  if (servico_id) {
+    query = query.eq("servico_id", servico_id);
+  } else if (lead_id && obra_id) {
     query = query.or(`lead_id.eq.${lead_id},obra_id.eq.${obra_id}`);
   } else if (lead_id) {
     query = query.eq("lead_id", lead_id);
@@ -56,16 +59,18 @@ export async function uploadDocumento(params: {
   file: File;
   lead_id?: string;
   obra_id?: string;
+  servico_id?: string;
   secao: string;
   tipo_doc: string;
 }): Promise<Documento> {
-  const { file, lead_id, obra_id, secao, tipo_doc } = params;
+  const { file, lead_id, obra_id, servico_id, secao, tipo_doc } = params;
 
   if (await workspaceUsaStorageExterno()) {
     const form = new FormData();
     form.append("file", file);
     if (lead_id) form.append("lead_id", lead_id);
     if (obra_id) form.append("obra_id", obra_id);
+    if (servico_id) form.append("servico_id", servico_id);
     form.append("secao", secao);
     form.append("tipo_doc", tipo_doc);
 
@@ -76,7 +81,7 @@ export async function uploadDocumento(params: {
   }
 
   // Caminho padrão Supabase (inalterado).
-  const ownerId = lead_id ?? obra_id ?? "sem-id";
+  const ownerId = lead_id ?? obra_id ?? servico_id ?? "sem-id";
   const timestamp = Date.now();
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "bin";
   const nomeSeguro = tipo_doc.replace(/[^a-z0-9_-]/gi, "_");
@@ -92,6 +97,7 @@ export async function uploadDocumento(params: {
     .insert({
       lead_id: lead_id ?? null,
       obra_id: obra_id ?? null,
+      servico_id: servico_id ?? null,
       secao,
       tipo_doc,
       nome_arquivo: file.name,

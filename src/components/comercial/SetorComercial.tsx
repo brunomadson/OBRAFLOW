@@ -1,5 +1,6 @@
 "use client";
 import { useState, useMemo, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { useLeads } from "@/hooks/useLeads";
 import { usePermissoes } from "@/hooks/usePermissoes";
 import { getCorrespondentes } from "@/services/correspondentes.service";
@@ -20,6 +21,8 @@ const ETAPAS_COM_FORM = new Set<EtapaLead>(["reuniao", "analise", "aprovada", "r
 export default function SetorComercial() {
   const { leads, loading, salvar, avancarEtapa, enviarParaObras } = useLeads();
   const { pode } = usePermissoes();
+  const searchParams = useSearchParams();
+  const leadParam = searchParams.get("lead");
   const [aba, setAba]       = useState<Aba>("dashboard");
   const [busca, setBusca]   = useState("");
   const [modalLead, setModalLead] = useState<Lead | "novo" | null>(null);
@@ -29,6 +32,15 @@ export default function SetorComercial() {
   useEffect(() => {
     getCorrespondentes().then(setCorrespondentes).catch(() => {});
   }, []);
+
+  // Veio de um link de alerta (ex: /comercial?lead=xxx) — abre direto o lead.
+  const [linkConsumido, setLinkConsumido] = useState(false);
+  useEffect(() => {
+    if (linkConsumido || !leadParam || leads.length === 0) return;
+    const lead = leads.find((l) => l.id === leadParam);
+    if (lead) setModalLead(lead);
+    setLinkConsumido(true);
+  }, [leadParam, leads, linkConsumido]);
 
   const leadsFiltrados = useMemo(
     () =>

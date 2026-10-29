@@ -190,6 +190,7 @@ function AbaMembros() {
         usuario_id: profile?.id ?? null,
         usuario_nome: profile?.nome ?? "Sistema",
         lead_id: null,
+        servico_id: null,
         obra_id: null,
         setor: null,
         etapa: null,
@@ -257,6 +258,7 @@ const SETORES_MATRIZ: { id: SetorPermissao; label: string }[] = [
   { id: "membros",       label: "Membros" },
   { id: "integracoes",   label: "Integrações" },
   { id: "documentos",    label: "Documentos" },
+  { id: "servicos-tecnicos", label: "Serviços Técnicos" },
 ];
 const ACOES_MATRIZ: { campo: "pode_visualizar" | "pode_criar" | "pode_editar" | "pode_excluir"; label: string }[] = [
   { campo: "pode_visualizar", label: "Ver" },
@@ -303,6 +305,7 @@ function AbaCargos() {
         usuario_id: profile?.id ?? null,
         usuario_nome: profile?.nome ?? "Sistema",
         lead_id: null,
+        servico_id: null,
         obra_id: null,
         setor: null,
         etapa: null,

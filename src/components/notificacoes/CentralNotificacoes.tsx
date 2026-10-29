@@ -1,11 +1,16 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useLeads } from "@/hooks/useLeads";
 import { useObras } from "@/hooks/useObras";
+import { useFinanceiro } from "@/hooks/useFinanceiro";
+import { useServicos } from "@/hooks/useServicos";
 import { useNotificacoes } from "@/hooks/useNotificacoes";
 import { useConfig } from "@/hooks/useConfig";
+import { getRecebimentos } from "@/services/recebimentos.service";
+import { getLancamentosServicosTecnicos, type LancamentoComServico } from "@/services/lancamentosServico.service";
 import Badge from "@/components/ui/Badge";
-import type { Notificacao } from "@/types/app.types";
+import Link from "next/link";
+import type { Notificacao, Recebimento } from "@/types/app.types";
 
 const TIPO_COR: Record<Notificacao["tipo"], string> = {
   critico: "#EF4444",
@@ -26,17 +31,24 @@ const ICON: Record<Notificacao["tipo"], string> = {
 };
 
 const SETORES = [
-  { id: "todos",      label: "Todos" },
-  { id: "comercial",  label: "Comercial" },
-  { id: "obras",      label: "Obras" },
-  { id: "financeiro", label: "Financeiro" },
+  { id: "todos",              label: "Todos" },
+  { id: "comercial",          label: "Comercial" },
+  { id: "obras",              label: "Obras" },
+  { id: "financeiro",         label: "Financeiro" },
+  { id: "servicos-tecnicos",  label: "Serviços Técnicos" },
 ];
 
 export default function CentralNotificacoes() {
   const { leads } = useLeads();
   const { obras } = useObras();
+  const { lancamentos } = useFinanceiro();
+  const { servicos } = useServicos();
+  const [recebimentos, setRecebimentos] = useState<Recebimento[]>([]);
+  useEffect(() => { getRecebimentos().then(setRecebimentos).catch(() => {}); }, []);
+  const [lancamentosServicos, setLancamentosServicos] = useState<LancamentoComServico[]>([]);
+  useEffect(() => { getLancamentosServicosTecnicos().then(setLancamentosServicos).catch(() => {}); }, []);
   const config = useConfig();
-  const notifs = useNotificacoes(leads, obras, config, []);
+  const notifs = useNotificacoes(leads, obras, config, lancamentos, recebimentos, servicos, lancamentosServicos);
 
   const [filtroTipo,  setFiltroTipo]  = useState<Notificacao["tipo"] | "todas">("todas");
   const [filtroSetor, setFiltroSetor] = useState<string>("todos");
@@ -132,6 +144,15 @@ export default function CentralNotificacoes() {
                   </div>
                 </div>
                 <p className="text-xs text-slate-600 leading-relaxed">{n.mensagem}</p>
+                {n.href && (
+                  <Link
+                    href={n.href}
+                    className="inline-block mt-2 text-[11px] font-bold px-2.5 py-1 rounded-lg text-white transition-opacity hover:opacity-90"
+                    style={{ background: TIPO_COR[n.tipo] }}
+                  >
+                    {n.acao ?? "Ver detalhes"} →
+                  </Link>
+                )}
               </div>
             </div>
           ))}

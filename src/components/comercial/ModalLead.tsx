@@ -12,11 +12,14 @@ import {
 } from "@/constants/dominios";
 import AbaDocumentos from "@/components/shared/AbaDocumentos";
 import AbaHistorico from "@/components/shared/AbaHistorico";
+import AvisoComposicaoVenda from "@/components/shared/AvisoComposicaoVenda";
 import { fmtBRL, fmtDate, fmtDateTime, maskCPF, maskPhone, gerarLinkCalendar, validarCPF } from "@/lib/utils";
 import { getCorrespondentes, createCorrespondente, deleteCorrespondente } from "@/services/correspondentes.service";
+import { buscarClientePorCpfCnpj, getCliente, updateCliente } from "@/services/clientes.service";
 import { getCorretores, createCorretor, deleteCorretor } from "@/services/corretores.service";
 import { getCidades, createCidade, deleteCidade } from "@/services/cidades.service";
-import type { Lead, EtapaLead, Correspondente, Corretor, Cidade } from "@/types/app.types";
+import ModalCliente from "@/components/clientes/ModalCliente";
+import type { Lead, EtapaLead, Correspondente, Corretor, Cidade, Cliente } from "@/types/app.types";
 import toast from "react-hot-toast";
 
 /* ───────── helpers ───────────────────────────────────────────────────────── */
@@ -28,6 +31,7 @@ type SubModal =
   | "novoCorrespondente"
   | "novoCorretor"
   | "gerenciarCidades"
+  | "historicoCliente"
   | null;
 
 const EMPTY_LEAD: Partial<Lead> = {
@@ -35,7 +39,7 @@ const EMPTY_LEAD: Partial<Lead> = {
   cidade: "", origem: ORIGENS[0], tipo_renda: TIPOS_RENDA[0],
   modalidade: MODALIDADES[0], origem_recurso: null,
   renda_bruta: 0, valor_caixa: 0, valor_venda: 0, valor_subsidio: 0,
-  valor_lote: 0, valor_financiamento: 0,
+  valor_lote: 0, valor_financiamento: 0, recursos_proprios: 0,
   dependente: false, fgts_3anos: false, com_conjuge: false,
   tamanho_imovel: "", com_muro: null,
 };
@@ -590,7 +594,7 @@ export function ModalResultado({ onClose, onAprovar, onReprovar, nomeLead, initi
 /* ───────── formulário de edição com todos os campos ─────────────────────── */
 function FormLead({
   lead, onChange, correspondentes, corretores, cidades,
-  onAddCorrespondente, onAddCorretor, onGerenciarCidades,
+  onAddCorrespondente, onAddCorretor, onGerenciarCidades, onVerHistoricoCliente,
 }: {
   lead: Partial<Lead>;
   onChange: (d: Partial<Lead>) => void;
@@ -600,8 +604,35 @@ function FormLead({
   onAddCorrespondente: () => void;
   onAddCorretor: () => void;
   onGerenciarCidades: () => void;
+  onVerHistoricoCliente: (clienteId: string) => void;
 }) {
   const set = (k: keyof Lead, v: unknown) => onChange({ ...lead, [k]: v });
+  const [buscandoCliente, setBuscandoCliente] = useState(false);
+
+  // Ao sair do campo CPF, busca se já existe um cliente com esse CPF —
+  // autopreenche nome/telefone/email só onde ainda está vazio (nunca
+  // sobrescreve o que o usuário já digitou) e liga o lead a esse cliente.
+  const handleBlurCpf = async () => {
+    if (!lead.cpf || !validarCPF(lead.cpf)) return;
+    setBuscandoCliente(true);
+    try {
+      const cliente = await buscarClientePorCpfCnpj(lead.cpf);
+      if (cliente) {
+        onChange({
+          ...lead,
+          cliente_id: cliente.id,
+          nome: lead.nome || cliente.nome,
+          telefone: lead.telefone || cliente.telefone || lead.telefone,
+          email: lead.email || cliente.email || lead.email,
+        });
+        toast.success(`Cliente já cadastrado — dados preenchidos (${cliente.nome})`);
+      }
+    } catch {
+      // busca falhou silenciosamente — não impede o preenchimento manual
+    } finally {
+      setBuscandoCliente(false);
+    }
+  };
 
   return (
     <div className="space-y-5">
@@ -615,15 +646,28 @@ function FormLead({
               className="input-base" placeholder="Nome do cliente" />
           </div>
           <div>
-            <label className="field-label">CPF</label>
+            <label className="field-label">CPF{buscandoCliente ? " (buscando...)" : ""}</label>
             <input
               value={lead.cpf ?? ""}
               onChange={(e) => set("cpf", maskCPF(e.target.value))}
+              onBlur={handleBlurCpf}
               maxLength={14}
               className={`input-base ${lead.cpf && !validarCPF(lead.cpf) ? "border-red-300" : ""}`}
               placeholder="000.000.000-00"
             />
             {lead.cpf && !validarCPF(lead.cpf) && <p className="text-[10px] text-red-500 mt-0.5">CPF inválido</p>}
+            {lead.cliente_id && (
+              <p className="text-[10px] text-emerald-600 mt-0.5">
+                ★ Cliente já cadastrado no sistema —{" "}
+                <button
+                  type="button"
+                  onClick={() => onVerHistoricoCliente(lead.cliente_id as string)}
+                  className="underline hover:text-emerald-800"
+                >
+                  ver histórico
+                </button>
+              </p>
+            )}
           </div>
           <div>
             <label className="field-label">Data de Nascimento</label>
@@ -806,6 +850,10 @@ function FormLead({
             <CurrencyInput value={lead.valor_financiamento} onChange={(v) => set("valor_financiamento", v)} placeholder="Ex: 110000" />
           </div>
           <div>
+            <label className="field-label">Recursos Próprios (R$)</label>
+            <CurrencyInput value={lead.recursos_proprios} onChange={(v) => set("recursos_proprios", v)} placeholder="Ex: 10000" />
+          </div>
+          <div>
             <label className="field-label">Subsídio (R$)</label>
             <CurrencyInput value={lead.valor_subsidio} onChange={(v) => set("valor_subsidio", v)} placeholder="Ex: 30000" />
           </div>
@@ -814,6 +862,12 @@ function FormLead({
             <CurrencyInput value={lead.valor_venda} onChange={(v) => set("valor_venda", v)} placeholder="Ex: 150000" />
           </div>
         </div>
+        <AvisoComposicaoVenda
+          financiado={lead.valor_financiamento}
+          recursosProprios={lead.recursos_proprios}
+          subsidio={lead.valor_subsidio}
+          venda={lead.valor_venda}
+        />
       </div>
 
       {/* Extras */}
@@ -858,6 +912,7 @@ function PerfilLead({ lead }: { lead: Lead }) {
           { label: "Subsídio",          valor: fmtBRL(lead.valor_subsidio),      cor: "text-purple-500" },
           { label: "Terreno",           valor: fmtBRL(lead.valor_lote),          cor: "text-amber-500" },
           { label: "Valor Financiado",  valor: fmtBRL(lead.valor_financiamento), cor: "text-cyan-500" },
+          { label: "Recursos Próprios", valor: fmtBRL(lead.recursos_proprios),   cor: "text-slate-700" },
         ].map((f) => (
           <div key={f.label} className="card p-3 text-center">
             <p className="text-[9px] font-bold text-slate-400 mb-1 uppercase tracking-wider">{f.label}</p>
@@ -938,6 +993,19 @@ export default function ModalLead({ lead, onClose, onSave, onAvancar, onEnviarOb
   const [correspondentes, setCorrespondentes] = useState<Correspondente[]>([]);
   const [corretores, setCorretores]           = useState<Corretor[]>([]);
   const [cidades, setCidades]                 = useState<Cidade[]>([]);
+  const [clienteHistorico, setClienteHistorico] = useState<Cliente | null>(null);
+
+  const handleVerHistoricoCliente = useCallback(async (clienteId: string) => {
+    try {
+      const cliente = await getCliente(clienteId);
+      if (cliente) {
+        setClienteHistorico(cliente);
+        setSubModal("historicoCliente");
+      }
+    } catch {
+      toast.error("Erro ao carregar dados do cliente.");
+    }
+  }, []);
 
   useEffect(() => {
     getCorrespondentes().then(setCorrespondentes).catch(() => {});
@@ -1040,6 +1108,7 @@ export default function ModalLead({ lead, onClose, onSave, onAvancar, onEnviarOb
               onAddCorrespondente={() => setSubModal("novoCorrespondente")}
               onAddCorretor={() => setSubModal("novoCorretor")}
               onGerenciarCidades={() => setSubModal("gerenciarCidades")}
+              onVerHistoricoCliente={handleVerHistoricoCliente}
             />
           )}
         </div>
@@ -1154,6 +1223,16 @@ export default function ModalLead({ lead, onClose, onSave, onAvancar, onEnviarOb
           }}
           onDeleted={(id) => {
             setCidades((prev) => prev.filter((c) => c.id !== id));
+          }}
+        />
+      )}
+      {subModal === "historicoCliente" && clienteHistorico && (
+        <ModalCliente
+          cliente={clienteHistorico}
+          onClose={() => { setSubModal(null); setClienteHistorico(null); }}
+          onSave={async (data) => {
+            if (!clienteHistorico.id) return;
+            await updateCliente(clienteHistorico.id, data);
           }}
         />
       )}

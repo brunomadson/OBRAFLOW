@@ -10,6 +10,7 @@ export const GRUPOS_COR: Record<string, string> = {
   "Receita Obras": "#10B981",
   "Receita Outras":"#34D399",
   "Capital":       "#6366F1",
+  "Receita Serviços Técnicos": "#EC4899",
 };
 
 // ─── 19 categorias de saída em 7 grupos ──────────────────────────────────────
@@ -17,7 +18,7 @@ export const CATEGORIAS_SAIDA: Record<string, string[]> = {
   "Custo Obra":    ["Material de construção", "Mão de obra", "Projetos e taxas técnicas"],
   "Administrativo":["Salário / Pro-labore", "Aluguel", "Contador / Contabilidade"],
   "Operacional":   ["Combustível", "Cartório"],
-  "Comercial":     ["Comissão corretor", "Bônus indicação"],
+  "Comercial":     ["Comissão corretor", "Bônus indicação", "Comissão de Indicação"],
   "Impostos":      ["DAS / Simples Nacional", "ISS", "Tarifas bancárias", "INSS", "FGTS"],
   "Marketing":     ["Influenciador", "Tráfego pago"],
   "Outros":        ["Outros"],
@@ -28,6 +29,7 @@ export const CATEGORIAS_ENTRADA: Record<string, string[]> = {
   "Receita Obras": ["Medição Caixa", "Adiantamento cliente", "Venda de lote"],
   "Receita Outras":["Receita diversa"],
   "Capital":       ["Aporte sócio", "Empréstimo", "Investidor"],
+  "Receita Serviços Técnicos": ["Pagamento de Cliente"],
 };
 
 // ─── Lookup: categoria → grupo ────────────────────────────────────────────────

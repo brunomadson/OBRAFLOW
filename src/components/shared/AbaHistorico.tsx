@@ -6,21 +6,23 @@ import type { Historico, TipoHistorico } from "@/types/app.types";
 type FiltroTipo = TipoHistorico | "todos";
 
 const FILTROS: { id: FiltroTipo; label: string }[] = [
-  { id: "todos",     label: "Todos" },
-  { id: "comercial", label: "Comercial" },
-  { id: "obras",     label: "Obras" },
-  { id: "documento", label: "Documentos" },
-  { id: "medicao",   label: "Medições" },
-  { id: "sistema",   label: "Sistema" },
+  { id: "todos",           label: "Todos" },
+  { id: "comercial",       label: "Comercial" },
+  { id: "obras",           label: "Obras" },
+  { id: "servico_tecnico", label: "Serviços Técnicos" },
+  { id: "documento",       label: "Documentos" },
+  { id: "medicao",         label: "Medições" },
+  { id: "sistema",         label: "Sistema" },
 ];
 
 const COR_TIPO: Record<TipoHistorico, string> = {
-  lead:      "text-blue-400",
-  comercial: "text-violet-400",
-  obras:     "text-emerald-500",
-  documento: "text-orange-400",
-  medicao:   "text-cyan-500",
-  sistema:   "text-slate-400",
+  lead:            "text-blue-400",
+  comercial:       "text-violet-400",
+  obras:           "text-emerald-500",
+  servico_tecnico: "text-pink-500",
+  documento:       "text-orange-400",
+  medicao:         "text-cyan-500",
+  sistema:         "text-slate-400",
 };
 
 function IconTipo({ tipo }: { tipo: TipoHistorico }) {
@@ -60,6 +62,12 @@ function IconTipo({ tipo }: { tipo: TipoHistorico }) {
           <path d="M2 12l3-5 3 4 2.5-3L14 12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       );
+    case "servico_tecnico":
+      return (
+        <svg className={cls} viewBox="0 0 16 16" fill="none">
+          <path d="M10.5 2.5l3 3-2 2-3-3 2-2zM2 14l4.5-4.5M6 8.5L4 6.5 2.5 8l2 2z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
     default:
       return (
         <svg className={cls} viewBox="0 0 16 16" fill="none">
@@ -80,9 +88,10 @@ function fmtDataHora(iso: string) {
 interface Props {
   leadId?: string;
   obraId?: string;
+  servicoId?: string;
 }
 
-export default function AbaHistorico({ leadId, obraId }: Props) {
+export default function AbaHistorico({ leadId, obraId, servicoId }: Props) {
   const [historico, setHistorico] = useState<Historico[]>([]);
   const [loading, setLoading] = useState(true);
   const [busca, setBusca] = useState("");
@@ -91,14 +100,14 @@ export default function AbaHistorico({ leadId, obraId }: Props) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await getHistorico({ lead_id: leadId, obra_id: obraId });
+      const data = await getHistorico({ lead_id: leadId, obra_id: obraId, servico_id: servicoId });
       setHistorico(data);
     } catch {
       // silencioso
     } finally {
       setLoading(false);
     }
-  }, [leadId, obraId]);
+  }, [leadId, obraId, servicoId]);
 
   useEffect(() => { load(); }, [load]);
 

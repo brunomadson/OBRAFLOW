@@ -1,11 +1,25 @@
 "use client";
 import { useState, useMemo, useCallback, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { useFinanceiro } from "@/hooks/useFinanceiro";
 import { useMetas } from "@/hooks/useMetas";
 import { usePermissoes } from "@/hooks/usePermissoes";
 import { getObras } from "@/services/obras.service";
 import { getContasBancarias, createContaBancaria, deleteContaBancaria } from "@/services/contas-bancarias.service";
-import { cn, compareValues, fmtBRL, fmtDate, nextSort, type SortState } from "@/lib/utils";
+import { getRecebimentos, createRecebimento } from "@/services/recebimentos.service";
+import { calcularCronogramaMensal, custoMaximoPermitido, calcularPrevistoNoPeriodo, calcularFluxoCaixaPeriodo } from "@/lib/cronogramaFinanceiro";
+import { calcularVisaoGeralObra } from "@/lib/visaoGeralObra";
+import { useEmpresaContexto } from "@/hooks/useEmpresaContexto";
+import { baixarPdf } from "@/lib/pdf/baixarPdf";
+import { gerarRelatorioVisaoGeral } from "@/lib/pdf/relatorios/visaoGeral";
+import { gerarRelatorioFluxoCaixa } from "@/lib/pdf/relatorios/fluxoCaixa";
+import { gerarRelatorioOrcadoRealizado } from "@/lib/pdf/relatorios/orcadoRealizado";
+import { gerarRelatorioLancamentos } from "@/lib/pdf/relatorios/lancamentos";
+import { cn, compareValues, fmtBRL, fmtDate, nextSort, diasAteVencer, statusReal, type SortState } from "@/lib/utils";
+import {
+  Kpi, GraficoFluxo, GraficoCustos, PizzaVencimentos, ultimos6Meses, varPct,
+  type FiltroVenc, FILTRO_VENC_LABEL, FILTRO_VENC_COR, filtraVencimentos,
+} from "@/components/financeiro/GraficosFinanceiro";
 import Button from "@/components/ui/Button";
 import Modal, { ModalHeader } from "@/components/ui/Modal";
 import { SkeletonTable } from "@/components/ui/Skeleton";
@@ -14,53 +28,19 @@ import {
   CATEGORIAS_SAIDA, CATEGORIAS_ENTRADA, GRUPOS_COR,
   FORMAS_PAGAMENTO, GRUPO_DE_CATEGORIA, GRUPOS_SAIDA_DRE, GRUPOS_SAIDA_ORDEM,
 } from "@/constants/financeiro";
-import type { ContaBancaria, Lancamento, Obra, StatusPagamento } from "@/types/app.types";
+import type { ContaBancaria, Lancamento, Obra, StatusPagamento, Recebimento, OrigemRecebimento } from "@/types/app.types";
 import toast from "react-hot-toast";
 
 /* ─── helpers ────────────────────────────────────────────────────────────────── */
 type FinTab = "dashboard" | "dre" | "lancamentos" | "por_obra";
 
-const MESES_PT = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
-
 function hoje(): string { return new Date().toISOString().slice(0, 10); }
-
-function fmtK(v: number): string {
-  const s = v < 0 ? "-" : "";
-  const a = Math.abs(v);
-  if (a >= 1_000_000) return `${s}R$${(a / 1_000_000).toFixed(1)}M`;
-  if (a >= 1_000)     return `${s}R$${(a / 1_000).toFixed(0)}k`;
-  return `${s}R$${a.toFixed(0)}`;
-}
-
-function diasAteVencer(dvStr: string | null): number | null {
-  if (!dvStr) return null;
-  return Math.ceil((new Date(dvStr + "T00:00:00").getTime() - Date.now()) / 86_400_000);
-}
-
-function statusReal(l: Lancamento): StatusPagamento {
-  if (l.status_pagamento === "pago") return "pago";
-  if (l.data_vencimento && diasAteVencer(l.data_vencimento)! < 0) return "vencido";
-  return "pendente";
-}
 
 const STATUS_COR: Record<StatusPagamento, string> = {
   pago:    "#10B981",
   pendente:"#F59E0B",
   vencido: "#EF4444",
 };
-
-function ultimos6Meses() {
-  const now = new Date();
-  return Array.from({ length: 6 }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
-    return { key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`, label: MESES_PT[d.getMonth()] };
-  });
-}
-
-function varPct(atual: number, anterior: number): number | null {
-  if (anterior === 0) return null;
-  return Math.round(((atual - anterior) / anterior) * 100);
-}
 
 /* ─── ModalPrioridades (A Vencer / Vencidos) ────────────────────────────────── */
 function ModalPrioridades({ tipo, lancamentos, onClose }: {
@@ -125,6 +105,24 @@ function IconTrash() {
         strokeLinejoin="round"
       />
     </svg>
+  );
+}
+
+/* ─── Botão "Gerar Relatório" (reutilizado em todas as abas) ─────────────────── */
+function BotaoGerarRelatorio({ onClick }: { onClick: () => void | Promise<void> }) {
+  const [gerando, setGerando] = useState(false);
+  const handleClick = async () => {
+    setGerando(true);
+    try { await onClick(); } catch { toast.error("Erro ao gerar relatório"); } finally { setGerando(false); }
+  };
+  return (
+    <button
+      onClick={handleClick}
+      disabled={gerando}
+      className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-slate-800 text-white hover:bg-slate-900 transition-colors disabled:opacity-50 whitespace-nowrap flex items-center gap-1.5"
+    >
+      {gerando ? "Gerando..." : "📄 Gerar Relatório"}
+    </button>
   );
 }
 
@@ -291,7 +289,7 @@ function ModalLancamento({ initial, obras, onClose, onSave }: ModalLancamentoPro
           data: d, data_vencimento: d || null, data_confirmacao: null,
           forma_pagamento: forma, status_pagamento: "pendente" as StatusPagamento,
           parcela_num: i + 1, parcela_total: nParc,
-          obra_id: obraId || null, conta_bancaria_id: contaBancariaId || null, obs: obs || null,
+          obra_id: obraId || null, servico_id: null, conta_bancaria_id: contaBancariaId || null, obs: obs || null,
         }));
         await onSave(lista);
       } else {
@@ -301,7 +299,7 @@ function ModalLancamento({ initial, obras, onClose, onSave }: ModalLancamentoPro
           data_vencimento: dataVenc || null, data_confirmacao: null,
           forma_pagamento: forma, status_pagamento: tipo === "entrada" ? "pago" : status,
           parcela_num: null, parcela_total: null,
-          obra_id: obraId || null, conta_bancaria_id: contaBancariaId || null, obs: obs || null,
+          obra_id: obraId || null, servico_id: null, conta_bancaria_id: contaBancariaId || null, obs: obs || null,
         }]);
       }
       onClose();
@@ -549,199 +547,7 @@ function ModalLancamento({ initial, obras, onClose, onSave }: ModalLancamentoPro
   );
 }
 
-/* ─── Gráfico Fluxo Mensal (SVG) ────────────────────────────────────────────── */
-function GraficoFluxo({ dados }: { dados: { label: string; ent: number; sai: number }[] }) {
-  const maxV = Math.max(...dados.flatMap((d) => [d.ent, d.sai]), 100);
-  const W = 540, H = 150, PAD_L = 52, PAD_R = 12, PAD_T = 10;
-  const BOTTOM_SPACE = 68; // mês label (14) + saldo (28) + legenda (26)
-  const chartW = W - PAD_L - PAD_R;
-  const colW = chartW / dados.length;
-  const BW = Math.floor(Math.min(22, (colW - 10) / 2));
-  const GAP = 3;
-
-  const barH = (v: number) => v > 0 ? Math.max(Math.round((v / maxV) * H), 3) : 0;
-  const barY = (v: number) => PAD_T + H - barH(v);
-
-  return (
-    <svg viewBox={`0 0 ${W} ${PAD_T + H + BOTTOM_SPACE}`} className="w-full">
-      {/* Grid lines + Y labels */}
-      {[1, 0.75, 0.5, 0.25, 0].map((p) => {
-        const y = PAD_T + H * (1 - p);
-        return (
-          <g key={p}>
-            <line
-              x1={PAD_L} y1={y} x2={W - PAD_R} y2={y}
-              stroke={p === 0 ? "#CBD5E1" : "#F1F5F9"}
-              strokeWidth={p === 0 ? 1.5 : 1}
-            />
-            <text x={PAD_L - 5} y={y + 3.5} textAnchor="end" fontSize={9} fill="#94A3B8">
-              {fmtK(maxV * p)}
-            </text>
-          </g>
-        );
-      })}
-
-      {/* Bars por mês */}
-      {dados.map((d, i) => {
-        const cx = PAD_L + i * colW + colW / 2;
-        const eH = barH(d.ent);
-        const sH = barH(d.sai);
-        const saldo = d.ent - d.sai;
-        return (
-          <g key={d.label}>
-            {eH > 0 && (
-              <rect x={cx - BW - GAP / 2} y={barY(d.ent)} width={BW} height={eH}
-                fill="#10B981" rx={2} opacity={0.85} />
-            )}
-            {sH > 0 && (
-              <rect x={cx + GAP / 2} y={barY(d.sai)} width={BW} height={sH}
-                fill="#EF4444" rx={2} opacity={0.85} />
-            )}
-            <text x={cx} y={PAD_T + H + 14} textAnchor="middle" fontSize={10} fill="#64748B">
-              {d.label}
-            </text>
-            <text x={cx} y={PAD_T + H + 27} textAnchor="middle" fontSize={9} fontWeight="bold"
-              fill={saldo >= 0 ? "#10B981" : "#EF4444"}>
-              {fmtK(saldo)}
-            </text>
-          </g>
-        );
-      })}
-
-      {/* Legenda */}
-      <rect x={PAD_L} y={PAD_T + H + 42} width={9} height={9} fill="#10B981" rx={2} />
-      <text x={PAD_L + 13} y={PAD_T + H + 50} fontSize={9} fill="#64748B">Entradas</text>
-      <rect x={PAD_L + 65} y={PAD_T + H + 42} width={9} height={9} fill="#EF4444" rx={2} />
-      <text x={PAD_L + 78} y={PAD_T + H + 50} fontSize={9} fill="#64748B">Saídas</text>
-    </svg>
-  );
-}
-
-/* ─── Gráfico Custos por Grupo (barras horizontais) ─────────────────────────── */
-function GraficoCustos({ saidas }: { saidas: Lancamento[] }) {
-  const totalSaida = saidas.reduce((s, l) => s + l.valor, 0) || 1;
-  const porGrupo = GRUPOS_SAIDA_ORDEM.map((g) => ({
-    grupo: g, valor: saidas.filter((l) => l.grupo === g).reduce((s, l) => s + l.valor, 0),
-  })).filter((g) => g.valor > 0).sort((a, b) => b.valor - a.valor);
-
-  return (
-    <div className="space-y-2.5">
-      {porGrupo.map(({ grupo, valor }) => {
-        const pct = (valor / totalSaida) * 100;
-        const cor = GRUPOS_COR[grupo] ?? "#94A3B8";
-        return (
-          <div key={grupo}>
-            <div className="flex justify-between text-[12px] mb-0.5">
-              <span className="font-semibold text-slate-700">{grupo}</span>
-              <span className="text-slate-500">{fmtBRL(valor)} <span className="text-slate-400">({pct.toFixed(1)}%)</span></span>
-            </div>
-            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-              <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: cor }} />
-            </div>
-          </div>
-        );
-      })}
-      {porGrupo.length === 0 && <p className="text-[12px] text-slate-400 text-center py-4">Sem saídas no período</p>}
-    </div>
-  );
-}
-
-/* ─── Pizza de Vencimentos (SVG donut) ──────────────────────────────────────── */
-function PizzaVencimentos({ saidas, onClickFatia }: {
-  saidas: Lancamento[];
-  onClickFatia: (filtro: string) => void;
-}) {
-  const pendentes = saidas.filter((l) => l.tipo === "saida" && statusReal(l) !== "pago");
-  const fatias = [
-    { label: "Hoje",       cor: "#EF4444", valor: pendentes.filter((l) => { const d = diasAteVencer(l.data_vencimento); return d !== null && d >= 0 && d <= 0; }).reduce((s, l) => s + l.valor, 0), filtro: "hoje" },
-    { label: "Em 7 dias",  cor: "#F97316", valor: pendentes.filter((l) => { const d = diasAteVencer(l.data_vencimento); return d !== null && d > 0 && d <= 7; }).reduce((s, l) => s + l.valor, 0), filtro: "7d" },
-    { label: "Em 30 dias", cor: "#F59E0B", valor: pendentes.filter((l) => { const d = diasAteVencer(l.data_vencimento); return d !== null && d > 7 && d <= 30; }).reduce((s, l) => s + l.valor, 0), filtro: "30d" },
-    { label: "Após 30d",   cor: "#94A3B8", valor: pendentes.filter((l) => { const d = diasAteVencer(l.data_vencimento); return d !== null && d > 30; }).reduce((s, l) => s + l.valor, 0), filtro: "apos" },
-  ];
-  const total = fatias.reduce((s, f) => s + f.valor, 0) || 1;
-
-  // Build SVG donut
-  const CX = 70, CY = 70, R = 52, ri = 30;
-  let cumulAngle = -Math.PI / 2;
-  const paths = fatias.map((f) => {
-    // Clamp abaixo de 360°: quando uma única fatia é 100% do total, o arco SVG
-    // termina exatamente onde começou e o comando "A" não desenha nada.
-    const angle = Math.min((f.valor / total) * 2 * Math.PI, 2 * Math.PI - 0.001);
-    const x1 = CX + R * Math.cos(cumulAngle);
-    const y1 = CY + R * Math.sin(cumulAngle);
-    cumulAngle += angle;
-    const x2 = CX + R * Math.cos(cumulAngle);
-    const y2 = CY + R * Math.sin(cumulAngle);
-    const xi1 = CX + ri * Math.cos(cumulAngle);
-    const yi1 = CY + ri * Math.sin(cumulAngle);
-    const xi2 = CX + ri * Math.cos(cumulAngle - angle);
-    const yi2 = CY + ri * Math.sin(cumulAngle - angle);
-    const large = angle > Math.PI ? 1 : 0;
-    const d = `M ${x1} ${y1} A ${R} ${R} 0 ${large} 1 ${x2} ${y2} L ${xi1} ${yi1} A ${ri} ${ri} 0 ${large} 0 ${xi2} ${yi2} Z`;
-    return { ...f, d, angle };
-  });
-
-  return (
-    <div className="flex items-center gap-4">
-      <svg viewBox="0 0 140 140" className="w-36 h-36 flex-shrink-0">
-        {paths.map((p) => (
-          <path
-            key={p.filtro}
-            d={p.d}
-            fill={p.valor > 0 ? p.cor : "#F1F5F9"}
-            className="cursor-pointer hover:opacity-80 transition-opacity"
-            onClick={() => p.valor > 0 && onClickFatia(p.filtro)}
-          />
-        ))}
-        <text x={CX} y={CY - 4} textAnchor="middle" fontSize={8} fill="#94A3B8">clique</text>
-        <text x={CX} y={CY + 8} textAnchor="middle" fontSize={9} fill="#475569" fontWeight="bold">{fmtK(total)}</text>
-      </svg>
-      <div className="space-y-2 flex-1">
-        {fatias.map((f) => (
-          <button
-            key={f.filtro}
-            onClick={() => f.valor > 0 && onClickFatia(f.filtro)}
-            className="w-full flex items-center gap-2 text-left group"
-          >
-            <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: f.cor }} />
-            <span className="text-[11px] text-slate-600 flex-1 group-hover:text-slate-900 transition-colors">{f.label}</span>
-            <span className="text-[11px] font-semibold text-slate-700">{fmtBRL(f.valor)}</span>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 /* ─── Modal Filtro Vencimentos ───────────────────────────────────────────────── */
-type FiltroVenc = "hoje" | "7d" | "30d" | "apos";
-
-const FILTRO_LABEL: Record<FiltroVenc, string> = {
-  hoje:  "Vencem Hoje",
-  "7d":  "Vencem em até 7 dias",
-  "30d": "Vencem em até 30 dias",
-  apos:  "Vencem após 30 dias",
-};
-
-const FILTRO_COR: Record<FiltroVenc, string> = {
-  hoje:  "#EF4444",
-  "7d":  "#F97316",
-  "30d": "#F59E0B",
-  apos:  "#94A3B8",
-};
-
-function filtraVenc(lancamentos: Lancamento[], filtro: FiltroVenc): Lancamento[] {
-  return lancamentos.filter((l) => {
-    if (l.tipo !== "saida" || statusReal(l) === "pago") return false;
-    const dias = diasAteVencer(l.data_vencimento);
-    if (dias === null) return false;
-    if (filtro === "hoje")  return dias >= 0 && dias <= 0;
-    if (filtro === "7d")    return dias > 0 && dias <= 7;
-    if (filtro === "30d")   return dias > 7 && dias <= 30;
-    if (filtro === "apos")  return dias > 30;
-    return false;
-  });
-}
 
 function ModalFiltroVencimentos({ filtro, lancamentos, obras, onPagar, onClose }: {
   filtro: FiltroVenc;
@@ -750,15 +556,15 @@ function ModalFiltroVencimentos({ filtro, lancamentos, obras, onPagar, onClose }
   onPagar: (id: string) => void;
   onClose: () => void;
 }) {
-  const lista = filtraVenc(lancamentos, filtro)
+  const lista = filtraVencimentos(lancamentos, "saida", filtro)
     .sort((a, b) => (a.data_vencimento ?? "").localeCompare(b.data_vencimento ?? ""));
   const total = lista.reduce((s, l) => s + l.valor, 0);
-  const cor   = FILTRO_COR[filtro];
+  const cor   = FILTRO_VENC_COR[filtro];
 
   return (
     <Modal onClose={onClose} size="lg">
       <ModalHeader
-        title={FILTRO_LABEL[filtro]}
+        title={FILTRO_VENC_LABEL[filtro]}
         subtitle={`${lista.length} lançamento${lista.length !== 1 ? "s" : ""} · Total: ${fmtBRL(total)}`}
         onClose={onClose}
       />
@@ -911,30 +717,6 @@ function TabDashboard({ lancamentos, obras, onAbrirPrioridades, onPagar }: {
 
   const insights = [insightCresceu, insightPreocupa, insightAcao];
 
-  function Kpi({ label, valor, cor, variacao, destaque, meta, metaLabel }: {
-    label: string; valor: string; cor: string; variacao?: number | null; destaque?: boolean;
-    meta?: number | null; metaLabel?: string;
-  }) {
-    return (
-      <div className={`card p-4 border-t-[3px]`} style={{ borderTopColor: cor }}>
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{label}</p>
-        <p className={`text-[18px] font-extrabold ${destaque ? "text-emerald-600" : "text-slate-900"}`}>{valor}</p>
-        <div className="flex items-center gap-2 flex-wrap mt-0.5">
-          {variacao !== undefined && variacao !== null && (
-            <p className={`text-[10px] font-semibold ${variacao >= 0 ? "text-emerald-500" : "text-red-500"}`}>
-              {variacao >= 0 ? "+" : ""}{variacao}% vs mês anterior
-            </p>
-          )}
-          {meta !== undefined && meta !== null && (
-            <p className={`text-[10px] font-semibold ${meta >= 0 ? "text-emerald-500" : "text-red-500"}`}>
-              {meta >= 0 ? "+" : ""}{meta}% vs meta{metaLabel ? ` (${metaLabel})` : ""}
-            </p>
-          )}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-5">
       {/* KPIs */}
@@ -986,7 +768,8 @@ function TabDashboard({ lancamentos, obras, onAbrirPrioridades, onPagar }: {
         <div className="card p-4">
           <p className="text-[11px] font-bold text-slate-700 mb-3">Vencimentos Pendentes</p>
           <PizzaVencimentos
-            saidas={lancamentos}
+            lancamentos={lancamentos}
+            tipo="saida"
             onClickFatia={(f) => setFiltroVenc(f as FiltroVenc)}
           />
         </div>
@@ -1221,6 +1004,26 @@ function lancSortValue(l: Lancamento, key: LancSortKey, obras: Obra[]): string |
   }
 }
 
+interface FiltroLancamentos {
+  tipo: "todos" | "entrada" | "saida";
+  statusF: "todos" | StatusPagamento;
+  obraF: string;
+  busca: string;
+  categoriaF: string;
+  formaPagamentoF: string;
+  contaBancariaF: string;
+  dataDeF: string;
+  dataAteF: string;
+  valorMinF: string;
+  valorMaxF: string;
+}
+
+const FAVORITOS_KEY = "obraflow_financeiro_filtros_favoritos";
+
+function getFavoritos(): { nome: string; filtro: FiltroLancamentos }[] {
+  try { return JSON.parse(localStorage.getItem(FAVORITOS_KEY) ?? "[]"); } catch { return []; }
+}
+
 function TabLancamentos({ lancamentos, obras, onEditar, onRemover, onPagar }: {
   lancamentos: Lancamento[];
   obras: Obra[];
@@ -1233,18 +1036,53 @@ function TabLancamentos({ lancamentos, obras, onEditar, onRemover, onPagar }: {
   const [obraF, setObraF]   = useState("");
   const [busca, setBusca]   = useState("");
   const [statusF, setStatusF] = useState<"todos" | StatusPagamento>("todos");
+  const [categoriaF, setCategoriaF] = useState("");
+  const [formaPagamentoF, setFormaPagamentoF] = useState("");
+  const [contaBancariaF, setContaBancariaF] = useState("");
+  const [dataDeF, setDataDeF] = useState("");
+  const [dataAteF, setDataAteF] = useState("");
+  const [valorMinF, setValorMinF] = useState("");
+  const [valorMaxF, setValorMaxF] = useState("");
   const [sort, setSort] = useState<SortState<LancSortKey> | null>(null);
+
+  const [contasBancarias, setContasBancarias] = useState<ContaBancaria[]>([]);
+  useEffect(() => { getContasBancarias().then(setContasBancarias).catch(() => {}); }, []);
+
+  const [favoritos, setFavoritos] = useState<{ nome: string; filtro: FiltroLancamentos }[]>([]);
+  const [favoritoSelecionado, setFavoritoSelecionado] = useState("");
+  useEffect(() => { setFavoritos(getFavoritos()); }, []);
+
+  const categoriasDisponiveis = useMemo(
+    () => [...new Set(lancamentos.map((l) => l.categoria).filter(Boolean))].sort((a, b) => a.localeCompare(b, "pt-BR")),
+    [lancamentos]
+  );
 
   const filtrados = useMemo(() => lancamentos.filter((l) => {
     if (tipo !== "todos" && l.tipo !== tipo) return false;
     if (obraF && l.obra_id !== obraF) return false;
     if (statusF !== "todos" && statusReal(l) !== statusF) return false;
+    if (categoriaF && l.categoria !== categoriaF) return false;
+    if (formaPagamentoF && l.forma_pagamento !== formaPagamentoF) return false;
+    if (contaBancariaF && l.conta_bancaria_id !== contaBancariaF) return false;
+    if (dataDeF && l.data < dataDeF) return false;
+    if (dataAteF && l.data > dataAteF) return false;
+    if (valorMinF && l.valor < Number(valorMinF)) return false;
+    if (valorMaxF && l.valor > Number(valorMaxF)) return false;
     if (busca && !l.descricao.toLowerCase().includes(busca.toLowerCase()) &&
         !l.categoria.toLowerCase().includes(busca.toLowerCase())) return false;
     return true;
-  }), [lancamentos, tipo, obraF, statusF, busca]);
+  }), [lancamentos, tipo, obraF, statusF, categoriaF, formaPagamentoF, contaBancariaF, dataDeF, dataAteF, valorMinF, valorMaxF, busca]);
 
   const totalFilt = filtrados.reduce((s, l) => s + (l.tipo === "entrada" ? l.valor : -l.valor), 0);
+
+  const { empresaNome, usuarioNome } = useEmpresaContexto();
+  const handleGerarRelatorioLancamentos = async () => {
+    const doc = gerarRelatorioLancamentos(
+      { empresaNome, usuarioNome, obraCliente: obraF ? (obras.find((o) => o.id === obraF)?.cliente ?? "—") : "Todas as obras (filtro aplicado)", obraCidade: null },
+      ordenados, obras
+    );
+    await baixarPdf(doc, "lancamentos-financeiro");
+  };
 
   const ordenados = useMemo(() => {
     if (!sort) return filtrados;
@@ -1252,35 +1090,124 @@ function TabLancamentos({ lancamentos, obras, onEditar, onRemover, onPagar }: {
     return [...filtrados].sort((a, b) => mult * compareValues(lancSortValue(a, sort.key, obras), lancSortValue(b, sort.key, obras)));
   }, [filtrados, sort, obras]);
 
+  const aplicarFiltro = (f: FiltroLancamentos) => {
+    setTipo(f.tipo); setStatusF(f.statusF); setObraF(f.obraF); setBusca(f.busca);
+    setCategoriaF(f.categoriaF); setFormaPagamentoF(f.formaPagamentoF); setContaBancariaF(f.contaBancariaF);
+    setDataDeF(f.dataDeF); setDataAteF(f.dataAteF); setValorMinF(f.valorMinF); setValorMaxF(f.valorMaxF);
+  };
+
+  const handleSalvarFavorito = () => {
+    const nome = window.prompt("Nome desse filtro:");
+    if (!nome?.trim()) return;
+    const filtroAtual: FiltroLancamentos = {
+      tipo, statusF, obraF, busca, categoriaF, formaPagamentoF, contaBancariaF, dataDeF, dataAteF, valorMinF, valorMaxF,
+    };
+    const novos = [...favoritos.filter((f) => f.nome !== nome.trim()), { nome: nome.trim(), filtro: filtroAtual }];
+    setFavoritos(novos);
+    localStorage.setItem(FAVORITOS_KEY, JSON.stringify(novos));
+    toast.success("Filtro salvo!");
+  };
+
+  const handleRemoverFavorito = (nome: string) => {
+    const novos = favoritos.filter((f) => f.nome !== nome);
+    setFavoritos(novos);
+    localStorage.setItem(FAVORITOS_KEY, JSON.stringify(novos));
+  };
+
   return (
     <div className="space-y-3">
       {/* Filtros */}
-      <div className="card p-3 flex flex-wrap gap-2 items-center">
-        <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
-          {(["todos", "entrada", "saida"] as const).map((t) => (
-            <button key={t} onClick={() => setTipo(t)}
-              className={`px-3 py-1 rounded-md text-[12px] font-semibold transition-colors ${tipo === t ? "bg-white shadow text-slate-800" : "text-slate-400 hover:text-slate-600"}`}>
-              {t === "todos" ? "Todos" : t === "entrada" ? "Entradas" : "Saídas"}
-            </button>
-          ))}
+      <div className="card p-3 space-y-2">
+        <div className="flex flex-wrap gap-2 items-center">
+          <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
+            {(["todos", "entrada", "saida"] as const).map((t) => (
+              <button key={t} onClick={() => setTipo(t)}
+                className={`px-3 py-1 rounded-md text-[12px] font-semibold transition-colors ${tipo === t ? "bg-white shadow text-slate-800" : "text-slate-400 hover:text-slate-600"}`}>
+                {t === "todos" ? "Todos" : t === "entrada" ? "Entradas" : "Saídas"}
+              </button>
+            ))}
+          </div>
+          <select value={statusF} onChange={(e) => setStatusF(e.target.value as typeof statusF)} className="input-base w-36 !py-1.5">
+            <option value="todos">Todos status</option>
+            <option value="pago">Pago</option>
+            <option value="pendente">A vencer</option>
+            <option value="vencido">Vencido</option>
+          </select>
+          <select value={obraF} onChange={(e) => setObraF(e.target.value)} className="input-base w-44 !py-1.5">
+            <option value="">Todas as obras</option>
+            {obras.map((o) => <option key={o.id} value={o.id}>{o.cliente ?? o.nome}</option>)}
+          </select>
+          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar..."
+            className="border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 outline-none focus:border-blue-400 w-40" />
+          <div className="ml-auto flex items-center gap-3">
+            <span className={`text-[13px] font-bold ${totalFilt >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+              Saldo filtrado: {totalFilt >= 0 ? "+" : ""}{fmtBRL(Math.abs(totalFilt))}
+            </span>
+            <span className="text-[11px] text-slate-400">({filtrados.length} registros)</span>
+            <BotaoGerarRelatorio onClick={handleGerarRelatorioLancamentos} />
+          </div>
         </div>
-        <select value={statusF} onChange={(e) => setStatusF(e.target.value as typeof statusF)} className="input-base w-36 !py-1.5">
-          <option value="todos">Todos status</option>
-          <option value="pago">Pago</option>
-          <option value="pendente">Pendente</option>
-          <option value="vencido">Vencido</option>
-        </select>
-        <select value={obraF} onChange={(e) => setObraF(e.target.value)} className="input-base w-44 !py-1.5">
-          <option value="">Todas as obras</option>
-          {obras.map((o) => <option key={o.id} value={o.id}>{o.cliente ?? o.nome}</option>)}
-        </select>
-        <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar..."
-          className="border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 outline-none focus:border-blue-400 w-40" />
-        <div className="ml-auto">
-          <span className={`text-[13px] font-bold ${totalFilt >= 0 ? "text-emerald-600" : "text-red-500"}`}>
-            Saldo filtrado: {totalFilt >= 0 ? "+" : ""}{fmtBRL(Math.abs(totalFilt))}
-          </span>
-          <span className="text-[11px] text-slate-400 ml-2">({filtrados.length} registros)</span>
+
+        <div className="flex flex-wrap gap-2 items-center border-t border-slate-100 pt-2">
+          <select value={categoriaF} onChange={(e) => setCategoriaF(e.target.value)} className="input-base w-40 !py-1.5">
+            <option value="">Todas categorias</option>
+            {categoriasDisponiveis.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <select value={formaPagamentoF} onChange={(e) => setFormaPagamentoF(e.target.value)} className="input-base w-36 !py-1.5">
+            <option value="">Toda forma pgto</option>
+            {FORMAS_PAGAMENTO.map((f) => <option key={f} value={f}>{f}</option>)}
+          </select>
+          <select value={contaBancariaF} onChange={(e) => setContaBancariaF(e.target.value)} className="input-base w-36 !py-1.5">
+            <option value="">Toda conta</option>
+            {contasBancarias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+          </select>
+          <div className="flex items-center gap-1">
+            <input type="date" value={dataDeF} onChange={(e) => setDataDeF(e.target.value)} className="input-base !py-1.5 !text-[11px]" />
+            <span className="text-slate-400 text-[11px]">até</span>
+            <input type="date" value={dataAteF} onChange={(e) => setDataAteF(e.target.value)} className="input-base !py-1.5 !text-[11px]" />
+          </div>
+          <div className="flex items-center gap-1">
+            <input type="number" value={valorMinF} onChange={(e) => setValorMinF(e.target.value)} placeholder="Valor mín."
+              className="input-base w-24 !py-1.5 !text-[11px]" />
+            <span className="text-slate-400 text-[11px]">–</span>
+            <input type="number" value={valorMaxF} onChange={(e) => setValorMaxF(e.target.value)} placeholder="Valor máx."
+              className="input-base w-24 !py-1.5 !text-[11px]" />
+          </div>
+
+          <div className="ml-auto flex items-center gap-1.5">
+            {favoritos.length > 0 && (
+              <div className="flex items-center gap-1">
+                <select
+                  value={favoritoSelecionado}
+                  onChange={(e) => {
+                    setFavoritoSelecionado(e.target.value);
+                    const f = favoritos.find((x) => x.nome === e.target.value);
+                    if (f) aplicarFiltro(f.filtro);
+                  }}
+                  className="input-base w-40 !py-1.5 !text-[11px]"
+                >
+                  <option value="">⭐ Filtros favoritos</option>
+                  {favoritos.map((f) => <option key={f.nome} value={f.nome}>{f.nome}</option>)}
+                </select>
+                {favoritoSelecionado && (
+                  <button
+                    onClick={() => { handleRemoverFavorito(favoritoSelecionado); setFavoritoSelecionado(""); }}
+                    title="Remover este filtro favorito"
+                    className="text-slate-300 hover:text-red-400 transition-colors p-1 flex-shrink-0"
+                  >
+                    <IconTrash />
+                  </button>
+                )}
+              </div>
+            )}
+            <button
+              onClick={handleSalvarFavorito}
+              title="Salvar filtro atual como favorito"
+              className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 transition-colors whitespace-nowrap"
+            >
+              ☆ Salvar filtro
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1371,14 +1298,36 @@ function TabLancamentos({ lancamentos, obras, onEditar, onRemover, onPagar }: {
 }
 
 /* ─── Modal Lançamentos por Obra ─────────────────────────────────────────────── */
-function ModalLancamentosObra({ obra, lancamentos, onClose }: {
+type SubTabObra = "visao_geral" | "fluxo_caixa" | "orcado_realizado" | "lancamentos" | "recebimentos";
+const SUB_TABS_OBRA: SubTabObra[] = ["visao_geral", "fluxo_caixa", "orcado_realizado", "lancamentos", "recebimentos"];
+
+function ModalLancamentosObra({ obra, lancamentos, onClose, onLancamentoCriado, initialSubTab }: {
   obra: Obra;
   lancamentos: Lancamento[];
   onClose: () => void;
+  onLancamentoCriado: (l: Lancamento) => void;
+  initialSubTab?: string;
 }) {
+  const { empresaNome, usuarioNome } = useEmpresaContexto();
+  const subTabValido = SUB_TABS_OBRA.includes(initialSubTab as SubTabObra) ? (initialSubTab as SubTabObra) : "visao_geral";
+  const [subTab, setSubTab] = useState<SubTabObra>(subTabValido);
   const ls  = lancamentos.filter((l) => l.obra_id === obra.id);
   const ent = ls.filter((l) => l.tipo === "entrada").reduce((s, l) => s + l.valor, 0);
   const sai = ls.filter((l) => l.tipo === "saida").reduce((s, l) => s + l.valor, 0);
+
+  const handleGerarRelatorioLancamentos = async () => {
+    const doc = gerarRelatorioLancamentos(
+      { empresaNome, usuarioNome, obraCliente: obra.cliente ?? obra.nome ?? "—", obraCidade: obra.cidade },
+      ls, [obra]
+    );
+    await baixarPdf(doc, `lancamentos-${obra.cliente ?? obra.nome ?? "obra"}`);
+  };
+
+  const [recebimentos, setRecebimentos] = useState<Recebimento[]>([]);
+  const [recebLoading, setRecebLoading] = useState(true);
+  useEffect(() => {
+    getRecebimentos(obra.id).then(setRecebimentos).catch(() => {}).finally(() => setRecebLoading(false));
+  }, [obra.id]);
 
   return (
     <Modal onClose={onClose} size="lg">
@@ -1387,69 +1336,730 @@ function ModalLancamentosObra({ obra, lancamentos, onClose }: {
         subtitle={`${obra.cidade ?? ""} · ${ls.length} lançamento${ls.length !== 1 ? "s" : ""}`}
         onClose={onClose}
       />
+      <div className="px-5 pt-3 flex gap-1 border-b border-slate-100">
+        {([["visao_geral", "Visão Geral"], ["fluxo_caixa", "Fluxo de Caixa"], ["orcado_realizado", "Orçado × Realizado"], ["lancamentos", "Lançamentos"], ["recebimentos", "Recebimentos"]] as const).map(([id, label]) => (
+          <button
+            key={id}
+            onClick={() => setSubTab(id)}
+            className={`px-3 py-2 text-[12px] font-bold border-b-2 transition-colors ${
+              subTab === id ? "border-blue-500 text-blue-600" : "border-transparent text-slate-400 hover:text-slate-600"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
       <div className="p-5 space-y-4 max-h-[65vh] overflow-y-auto">
-        {/* Resumo */}
-        <div className="grid grid-cols-3 gap-3">
-          <div className="bg-emerald-50 rounded-xl p-3 text-center">
-            <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider mb-0.5">Entradas</p>
-            <p className="text-[15px] font-extrabold text-emerald-700">{fmtBRL(ent)}</p>
-          </div>
-          <div className="bg-red-50 rounded-xl p-3 text-center">
-            <p className="text-[10px] text-red-500 font-bold uppercase tracking-wider mb-0.5">Saídas</p>
-            <p className="text-[15px] font-extrabold text-red-600">{fmtBRL(sai)}</p>
-          </div>
-          <div className={`rounded-xl p-3 text-center ${ent - sai >= 0 ? "bg-blue-50" : "bg-orange-50"}`}>
-            <p className="text-[10px] font-bold uppercase tracking-wider mb-0.5" style={{ color: ent - sai >= 0 ? "#3B82F6" : "#EA580C" }}>Saldo</p>
-            <p className="text-[15px] font-extrabold" style={{ color: ent - sai >= 0 ? "#1D4ED8" : "#DC2626" }}>
-              {ent - sai >= 0 ? "+" : ""}{fmtBRL(ent - sai)}
-            </p>
-          </div>
-        </div>
+        {subTab === "visao_geral" ? (
+          <AbaVisaoGeralObra obra={obra} lancamentosObra={ls} recebimentos={recebimentos} recebLoading={recebLoading} />
+        ) : subTab === "fluxo_caixa" ? (
+          <AbaFluxoCaixaObra obra={obra} lancamentosObra={ls} />
+        ) : subTab === "orcado_realizado" ? (
+          <AbaOrcadoRealizadoObra obra={obra} lancamentosObra={ls} />
+        ) : subTab === "lancamentos" ? (
+          <>
+            <div className="flex justify-end">
+              <BotaoGerarRelatorio onClick={handleGerarRelatorioLancamentos} />
+            </div>
 
-        {/* Lista */}
-        {ls.length === 0 ? (
-          <p className="text-center text-slate-400 py-8 text-[13px]">Nenhum lançamento vinculado a esta obra.</p>
+            {/* Resumo */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-emerald-50 rounded-xl p-3 text-center">
+                <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider mb-0.5">Entradas</p>
+                <p className="text-[15px] font-extrabold text-emerald-700">{fmtBRL(ent)}</p>
+              </div>
+              <div className="bg-red-50 rounded-xl p-3 text-center">
+                <p className="text-[10px] text-red-500 font-bold uppercase tracking-wider mb-0.5">Saídas</p>
+                <p className="text-[15px] font-extrabold text-red-600">{fmtBRL(sai)}</p>
+              </div>
+              <div className={`rounded-xl p-3 text-center ${ent - sai >= 0 ? "bg-blue-50" : "bg-orange-50"}`}>
+                <p className="text-[10px] font-bold uppercase tracking-wider mb-0.5" style={{ color: ent - sai >= 0 ? "#3B82F6" : "#EA580C" }}>Saldo</p>
+                <p className="text-[15px] font-extrabold" style={{ color: ent - sai >= 0 ? "#1D4ED8" : "#DC2626" }}>
+                  {ent - sai >= 0 ? "+" : ""}{fmtBRL(ent - sai)}
+                </p>
+              </div>
+            </div>
+
+            {/* Lista */}
+            {ls.length === 0 ? (
+              <p className="text-center text-slate-400 py-8 text-[13px]">Nenhum lançamento vinculado a esta obra.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {ls.sort((a, b) => b.data.localeCompare(a.data)).map((l) => {
+                  const st = statusReal(l);
+                  return (
+                    <div key={l.id} className="flex items-center gap-3 p-2.5 rounded-xl border border-slate-100 hover:bg-slate-50">
+                      <div
+                        className="w-2 h-2 rounded-full flex-shrink-0"
+                        style={{ background: l.tipo === "entrada" ? "#10B981" : "#EF4444" }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[12px] font-semibold text-slate-800 truncate">{l.descricao}</p>
+                        <p className="text-[10px] text-slate-400">{l.categoria} · {fmtDate(l.data)}</p>
+                      </div>
+                      <span
+                        className="text-[9px] font-bold px-1.5 py-0.5 rounded-full text-white"
+                        style={{ background: STATUS_COR[st] }}
+                      >
+                        {st === "pago" ? "Pago" : st === "pendente" ? "Pendente" : "Vencido"}
+                      </span>
+                      <span className={`text-[13px] font-bold flex-shrink-0 ${l.tipo === "entrada" ? "text-emerald-600" : "text-red-500"}`}>
+                        {l.tipo === "entrada" ? "+" : "−"}{fmtBRL(l.valor)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
         ) : (
-          <div className="space-y-1.5">
-            {ls.sort((a, b) => b.data.localeCompare(a.data)).map((l) => {
-              const st = statusReal(l);
-              return (
-                <div key={l.id} className="flex items-center gap-3 p-2.5 rounded-xl border border-slate-100 hover:bg-slate-50">
-                  <div
-                    className="w-2 h-2 rounded-full flex-shrink-0"
-                    style={{ background: l.tipo === "entrada" ? "#10B981" : "#EF4444" }}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[12px] font-semibold text-slate-800 truncate">{l.descricao}</p>
-                    <p className="text-[10px] text-slate-400">{l.categoria} · {fmtDate(l.data)}</p>
-                  </div>
-                  <span
-                    className="text-[9px] font-bold px-1.5 py-0.5 rounded-full text-white"
-                    style={{ background: STATUS_COR[st] }}
-                  >
-                    {st === "pago" ? "Pago" : st === "pendente" ? "Pendente" : "Vencido"}
-                  </span>
-                  <span className={`text-[13px] font-bold flex-shrink-0 ${l.tipo === "entrada" ? "text-emerald-600" : "text-red-500"}`}>
-                    {l.tipo === "entrada" ? "+" : "−"}{fmtBRL(l.valor)}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
+          <AbaRecebimentosObra
+            obra={obra}
+            recebimentos={recebimentos}
+            loading={recebLoading}
+            onRecebimentoCriado={(r) => setRecebimentos((prev) => [r, ...prev])}
+            onLancamentoCriado={onLancamentoCriado}
+          />
         )}
       </div>
     </Modal>
   );
 }
 
+/* ─── Fluxo de Caixa por Obra ──────────────────────────────────────────────────── */
+type PeriodoFluxo = "hoje" | "7d" | "30d" | "personalizado";
+
+function AbaFluxoCaixaObra({ obra, lancamentosObra }: { obra: Obra; lancamentosObra: Lancamento[] }) {
+  const [periodo, setPeriodo] = useState<PeriodoFluxo>("30d");
+  const hojeStr = new Date().toISOString().slice(0, 10);
+  const [dataIni, setDataIni] = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() - 29);
+    return d.toISOString().slice(0, 10);
+  });
+  const [dataFim, setDataFim] = useState(hojeStr);
+
+  const { empresaNome, usuarioNome } = useEmpresaContexto();
+
+  const { inicio, fim } = useMemo(() => {
+    const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+    if (periodo === "hoje") return { inicio: new Date(hoje), fim: new Date(hoje) };
+    if (periodo === "7d") { const i = new Date(hoje); i.setDate(i.getDate() - 6); return { inicio: i, fim: new Date(hoje) }; }
+    if (periodo === "30d") { const i = new Date(hoje); i.setDate(i.getDate() - 29); return { inicio: i, fim: new Date(hoje) }; }
+    return { inicio: new Date(`${dataIni}T00:00:00`), fim: new Date(`${dataFim}T00:00:00`) };
+  }, [periodo, dataIni, dataFim]);
+
+  const lancsNoPeriodo = lancamentosObra.filter((l) => {
+    const d = new Date(`${l.data}T00:00:00`);
+    return d >= inicio && d <= fim;
+  });
+
+  const {
+    entradasPrevistas, saidasPrevistas, saldoPrevisto,
+    entradasRecebidas, saidasRealizadas, saldoRealizado, saldoFuturo,
+  } = calcularFluxoCaixaPeriodo(obra, lancamentosObra, inicio, fim);
+  const temPrevisao = (obra.cronograma_financeiro?.length ?? 0) > 0 && !!obra.data_inicio;
+
+  const totalDias = Math.round((fim.getTime() - inicio.getTime()) / 86_400_000) + 1;
+  // O gráfico não tem espaço pra rótulo "DD/MM" em muitas barras — acima de
+  // ~10 dias agrupa por semana, e acima de ~5 meses agrupa por mês (senão
+  // datas/semanas se sobrepõem).
+  const granularidade: "dia" | "semana" | "mes" = totalDias > 150 ? "mes" : totalDias > 10 ? "semana" : "dia";
+  const buckets: { label: string; ent: number; sai: number }[] = [];
+
+  if (granularidade === "mes") {
+    let cursor = new Date(inicio.getFullYear(), inicio.getMonth(), 1);
+    while (cursor <= fim) {
+      const mesFim = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
+      const doPeriodo = lancsNoPeriodo.filter((l) => {
+        const d = new Date(`${l.data}T00:00:00`);
+        return d >= cursor && d <= mesFim && l.status_pagamento === "pago";
+      });
+      buckets.push({
+        label: cursor.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }),
+        ent: doPeriodo.filter((l) => l.tipo === "entrada").reduce((s, l) => s + l.valor, 0),
+        sai: doPeriodo.filter((l) => l.tipo === "saida").reduce((s, l) => s + l.valor, 0),
+      });
+      cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+    }
+  } else if (granularidade === "semana") {
+    let cursor = new Date(inicio);
+    let semana = 1;
+    while (cursor <= fim) {
+      const semFim = new Date(cursor); semFim.setDate(semFim.getDate() + 6);
+      const fimReal = semFim > fim ? fim : semFim;
+      const doPeriodo = lancsNoPeriodo.filter((l) => {
+        const d = new Date(`${l.data}T00:00:00`);
+        return d >= cursor && d <= fimReal && l.status_pagamento === "pago";
+      });
+      buckets.push({
+        label: `S${semana}`,
+        ent: doPeriodo.filter((l) => l.tipo === "entrada").reduce((s, l) => s + l.valor, 0),
+        sai: doPeriodo.filter((l) => l.tipo === "saida").reduce((s, l) => s + l.valor, 0),
+      });
+      cursor = new Date(cursor); cursor.setDate(cursor.getDate() + 7);
+      semana++;
+    }
+  } else {
+    for (let i = 0; i < totalDias; i++) {
+      const d = new Date(inicio); d.setDate(d.getDate() + i);
+      const key = d.toISOString().slice(0, 10);
+      const doDia = lancsNoPeriodo.filter((l) => l.data === key && l.status_pagamento === "pago");
+      buckets.push({
+        label: d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
+        ent: doDia.filter((l) => l.tipo === "entrada").reduce((s, l) => s + l.valor, 0),
+        sai: doDia.filter((l) => l.tipo === "saida").reduce((s, l) => s + l.valor, 0),
+      });
+    }
+  }
+
+  const Kpi = ({ label, valor, cor }: { label: string; valor: string; cor?: string }) => (
+    <div className="card p-3 text-center">
+      <p className="text-[9px] font-bold text-slate-400 mb-1 uppercase tracking-wider leading-tight">{label}</p>
+      <p className="text-[14px] font-extrabold" style={{ color: cor }}>{valor}</p>
+    </div>
+  );
+
+  const handleGerarRelatorio = async () => {
+    const doc = gerarRelatorioFluxoCaixa(
+      { empresaNome, usuarioNome, obraCliente: obra.cliente ?? obra.nome ?? "—", obraCidade: obra.cidade },
+      obra, lancamentosObra, inicio, fim
+    );
+    await baixarPdf(doc, `fluxo-de-caixa-${obra.cliente ?? obra.nome ?? "obra"}`);
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Filtro de período */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {([["hoje", "Hoje"], ["7d", "7 dias"], ["30d", "30 dias"], ["personalizado", "Personalizado"]] as const).map(([id, label]) => (
+          <button
+            key={id}
+            onClick={() => setPeriodo(id)}
+            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-colors ${
+              periodo === id ? "bg-blue-500 border-blue-500 text-white" : "border-slate-200 text-slate-500 hover:border-blue-300"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+        {periodo === "personalizado" && (
+          <div className="flex items-center gap-1.5">
+            <input type="date" value={dataIni} onChange={(e) => setDataIni(e.target.value)} className="input-base !py-1 !text-[11px]" />
+            <span className="text-slate-400 text-[11px]">até</span>
+            <input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)} className="input-base !py-1 !text-[11px]" />
+          </div>
+        )}
+        <div className="ml-auto">
+          <BotaoGerarRelatorio onClick={handleGerarRelatorio} />
+        </div>
+      </div>
+
+      {!temPrevisao && (
+        <p className="text-[11px] text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          Essa obra não tem Cronograma Financeiro configurado (ou falta a Data de Assinatura) — os valores previstos aparecem zerados.
+        </p>
+      )}
+
+      {/* KPIs */}
+      <div className="grid grid-cols-4 gap-2.5">
+        <Kpi label="Entradas Previstas" valor={fmtBRL(entradasPrevistas)} />
+        <Kpi label="Entradas Recebidas" valor={fmtBRL(entradasRecebidas)} cor="#059669" />
+        <Kpi label="Saídas Previstas" valor={fmtBRL(saidasPrevistas)} />
+        <Kpi label="Saídas Realizadas" valor={fmtBRL(saidasRealizadas)} cor="#DC2626" />
+        <Kpi label="Saldo Previsto" valor={fmtBRL(saldoPrevisto)} cor={saldoPrevisto >= 0 ? "#059669" : "#DC2626"} />
+        <Kpi label="Saldo Realizado" valor={fmtBRL(saldoRealizado)} cor={saldoRealizado >= 0 ? "#059669" : "#DC2626"} />
+        <Kpi label="Saldo Futuro (acumulado)" valor={fmtBRL(saldoFuturo)} cor={saldoFuturo >= 0 ? "#3B82F6" : "#DC2626"} />
+      </div>
+
+      {/* Gráfico */}
+      <div className="card p-4">
+        <p className="text-[11px] font-bold text-slate-700 mb-3">
+          Fluxo {granularidade === "mes" ? "por Mês" : granularidade === "semana" ? "por Semana" : "por Dia"} — {fmtDate(inicio.toISOString().slice(0, 10))} a {fmtDate(fim.toISOString().slice(0, 10))}
+        </p>
+        {buckets.every((b) => b.ent === 0 && b.sai === 0) ? (
+          <p className="text-center text-slate-400 py-8 text-[13px]">Nenhum lançamento pago nesse período.</p>
+        ) : (
+          <GraficoFluxo dados={buckets} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Visão Geral por Obra (KPIs) ─────────────────────────────────────────────── */
+function AbaVisaoGeralObra({ obra, lancamentosObra, recebimentos, recebLoading }: {
+  obra: Obra; lancamentosObra: Lancamento[]; recebimentos: Recebimento[]; recebLoading: boolean;
+}) {
+  const {
+    valorVenda, valorFinanciado, recursosProprios, subsidio,
+    receitaRecebida, receitaPendente: receitaPendenteLanc, custoPrevisto, custoRealizado, saldoDisponivel,
+    lucroPrevisto, lucroAtual, margemAtual, pctFinanceiro, pctCaixa, pctCliente, totalAReceber,
+  } = calcularVisaoGeralObra(obra, lancamentosObra, recebimentos);
+
+  const { empresaNome, usuarioNome } = useEmpresaContexto();
+  const handleGerarRelatorio = async () => {
+    const doc = gerarRelatorioVisaoGeral(
+      { empresaNome, usuarioNome, obraCliente: obra.cliente ?? obra.nome ?? "—", obraCidade: obra.cidade },
+      obra, lancamentosObra, recebimentos
+    );
+    await baixarPdf(doc, `visao-geral-${obra.cliente ?? obra.nome ?? "obra"}`);
+  };
+
+  const Kpi = ({ label, valor, cor }: { label: string; valor: string; cor?: string }) => (
+    <div className="card p-3 text-center">
+      <p className="text-[9px] font-bold text-slate-400 mb-1 uppercase tracking-wider leading-tight">{label}</p>
+      <p className="text-[14px] font-extrabold" style={{ color: cor }}>{valor}</p>
+    </div>
+  );
+
+  return (
+    <div className="space-y-5">
+      <div className="flex justify-end">
+        <BotaoGerarRelatorio onClick={handleGerarRelatorio} />
+      </div>
+
+      {/* Composição da venda */}
+      <div>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Composição da Venda</p>
+        <div className="grid grid-cols-4 gap-2">
+          <Kpi label="Valor de Venda" valor={fmtBRL(valorVenda)} cor="#059669" />
+          <Kpi label="Valor Financiado" valor={fmtBRL(valorFinanciado)} cor="#0891B2" />
+          <Kpi label="Recursos Próprios" valor={fmtBRL(recursosProprios)} cor="#334155" />
+          <Kpi label="Subsídio" valor={fmtBRL(subsidio)} cor="#9333EA" />
+        </div>
+      </div>
+
+      {/* Receita e Custo */}
+      <div>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Receita e Custo</p>
+        <div className="grid grid-cols-3 gap-2">
+          <Kpi label="Receita Prevista" valor={fmtBRL(valorVenda)} />
+          <Kpi label="Receita Recebida" valor={fmtBRL(receitaRecebida)} cor="#059669" />
+          <Kpi label="Receita Pendente" valor={fmtBRL(receitaPendenteLanc)} cor="#D97706" />
+          <Kpi label="Custo Previsto" valor={fmtBRL(custoPrevisto)} />
+          <Kpi label="Custo Realizado" valor={fmtBRL(custoRealizado)} cor="#DC2626" />
+          <Kpi label="Saldo Disponível" valor={fmtBRL(saldoDisponivel)} cor={saldoDisponivel >= 0 ? "#059669" : "#DC2626"} />
+        </div>
+      </div>
+
+      {/* Lucro */}
+      <div>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Lucro</p>
+        <div className="grid grid-cols-3 gap-2">
+          <Kpi label="Lucro Previsto" valor={fmtBRL(lucroPrevisto)} />
+          <Kpi label="Lucro Atual" valor={fmtBRL(lucroAtual)} cor={lucroAtual >= 0 ? "#059669" : "#DC2626"} />
+          <Kpi label="Margem Atual" valor={`${margemAtual.toFixed(1)}%`} cor={margemAtual >= 0 ? "#059669" : "#DC2626"} />
+        </div>
+      </div>
+
+      {/* Recebimento */}
+      <div>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Recebimento</p>
+        {recebLoading ? (
+          <p className="text-center text-slate-400 py-4 text-[12px]">Carregando...</p>
+        ) : (
+          <div className="grid grid-cols-4 gap-2">
+            <Kpi label="% Financeiro da Obra" valor={`${pctFinanceiro.toFixed(1)}%`} />
+            <Kpi label="Recebimento Caixa" valor={`${pctCaixa.toFixed(1)}%`} />
+            <Kpi label="Recebimento Cliente" valor={`${pctCliente.toFixed(1)}%`} />
+            <Kpi label="Total a Receber" valor={fmtBRL(totalAReceber)} cor="#D97706" />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Orçado × Realizado por Obra ─────────────────────────────────────────────── */
+function AbaOrcadoRealizadoObra({ obra, lancamentosObra }: { obra: Obra; lancamentosObra: Lancamento[] }) {
+  const { empresaNome, usuarioNome } = useEmpresaContexto();
+  const linhas = calcularCronogramaMensal(obra, lancamentosObra);
+  const custoMaximo = custoMaximoPermitido(obra);
+  const temCronograma = (obra.cronograma_financeiro?.length ?? 0) > 0;
+  const temDataInicio = !!obra.data_inicio;
+
+  if (!temCronograma) {
+    return (
+      <p className="text-center text-slate-400 py-8 text-[13px]">
+        Essa obra ainda não tem um Cronograma Financeiro configurado — cadastre em Obras → aba &quot;Cronograma Físico-Financeiro&quot;.
+      </p>
+    );
+  }
+
+  const valorVenda = obra.valor_venda ?? 0;
+
+  // "Até agora" = só os meses que já começaram, não o cronograma inteiro
+  // (senão sempre bate com o total, não diz nada sobre o momento atual).
+  const linhasAteAgora = temDataInicio ? linhas.filter((l) => l.jaComecou) : linhas;
+
+  const totalEntradaPrevisto = linhasAteAgora.reduce((s, l) => s + l.entradaPrevisto, 0);
+  const totalEntradaReal = linhasAteAgora.reduce((s, l) => s + (l.entradaReal ?? 0), 0);
+  const pctRecebido = totalEntradaPrevisto > 0 ? Math.min((totalEntradaReal / totalEntradaPrevisto) * 100, 999) : 0;
+  const abaixoDoPrevisto = totalEntradaReal < totalEntradaPrevisto;
+
+  const totalSaidaPrevisto = linhasAteAgora.reduce((s, l) => s + l.saidaPrevisto, 0);
+  const totalSaidaReal = linhasAteAgora.reduce((s, l) => s + (l.saidaReal ?? 0), 0);
+  const pctUtilizado = totalSaidaPrevisto > 0 ? Math.min((totalSaidaReal / totalSaidaPrevisto) * 100, 999) : 0;
+  const estourou = totalSaidaReal > totalSaidaPrevisto;
+
+  const handleGerarRelatorio = async () => {
+    const doc = gerarRelatorioOrcadoRealizado(
+      { empresaNome, usuarioNome, obraCliente: obra.cliente ?? obra.nome ?? "—", obraCidade: obra.cidade },
+      obra, lancamentosObra
+    );
+    await baixarPdf(doc, `orcado-x-realizado-${obra.cliente ?? obra.nome ?? "obra"}`);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <BotaoGerarRelatorio onClick={handleGerarRelatorio} />
+      </div>
+
+      {/* Receita (Entrada) */}
+      <div>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Receita (Entrada)</p>
+        <div className="grid grid-cols-4 gap-2.5">
+          <div className="card p-3 text-center">
+            <p className="text-[9px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Valor de Venda</p>
+            <p className="text-[14px] font-extrabold text-slate-700">{fmtBRL(valorVenda)}</p>
+          </div>
+          <div className="card p-3 text-center">
+            <p className="text-[9px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Orçado até agora</p>
+            <p className="text-[14px] font-extrabold text-slate-700">{fmtBRL(totalEntradaPrevisto)}</p>
+          </div>
+          <div className="card p-3 text-center">
+            <p className="text-[9px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Realizado</p>
+            <p className="text-[14px] font-extrabold" style={{ color: abaixoDoPrevisto ? "#D97706" : "#059669" }}>{fmtBRL(totalEntradaReal)}</p>
+          </div>
+          <div className="card p-3 text-center">
+            <p className="text-[9px] font-bold text-slate-400 mb-1 uppercase tracking-wider">% Recebido</p>
+            <p className="text-[14px] font-extrabold" style={{ color: abaixoDoPrevisto ? "#D97706" : "#059669" }}>{pctRecebido.toFixed(1)}%</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Custo (Saída) */}
+      <div>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Custo (Saída)</p>
+        <div className="grid grid-cols-4 gap-2.5">
+          <div className="card p-3 text-center">
+            <p className="text-[9px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Custo Máximo Permitido</p>
+            <p className="text-[14px] font-extrabold text-slate-700">{fmtBRL(custoMaximo)}</p>
+          </div>
+          <div className="card p-3 text-center">
+            <p className="text-[9px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Orçado até agora</p>
+            <p className="text-[14px] font-extrabold text-slate-700">{fmtBRL(totalSaidaPrevisto)}</p>
+          </div>
+          <div className="card p-3 text-center">
+            <p className="text-[9px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Realizado</p>
+            <p className="text-[14px] font-extrabold" style={{ color: estourou ? "#DC2626" : "#059669" }}>{fmtBRL(totalSaidaReal)}</p>
+          </div>
+          <div className="card p-3 text-center">
+            <p className="text-[9px] font-bold text-slate-400 mb-1 uppercase tracking-wider">% Utilizado</p>
+            <p className="text-[14px] font-extrabold" style={{ color: estourou ? "#DC2626" : "#059669" }}>{pctUtilizado.toFixed(1)}%</p>
+          </div>
+        </div>
+      </div>
+
+      {estourou && (
+        <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+          <span className="text-red-500 text-sm flex-shrink-0">⚠</span>
+          <p className="text-[11px] text-red-700 font-medium">
+            O realizado até agora (Saída) já ultrapassou o orçado previsto pra essa altura da obra em {fmtBRL(totalSaidaReal - totalSaidaPrevisto)}.
+          </p>
+        </div>
+      )}
+
+      {!temDataInicio && (
+        <p className="text-[11px] text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          Preencha a &quot;Data Assinatura (Início)&quot; da obra pra ver o Realizado por mês e o Orçado calculado só até o momento atual (sem isso, os cartões acima mostram o cronograma inteiro).
+        </p>
+      )}
+
+      <div className="border border-slate-100 rounded-xl overflow-x-auto">
+        <table className="w-full text-[11px]">
+          <thead className="bg-slate-50">
+            <tr>
+              <th className="text-left px-2 py-2 font-bold text-slate-500" rowSpan={2}>Mês</th>
+              <th className="text-right px-2 py-2 font-bold text-slate-500" rowSpan={2}>% Acum.</th>
+              <th className="text-right px-2 py-1 font-bold text-emerald-600" colSpan={2}>Entrada</th>
+              <th className="text-right px-2 py-1 font-bold text-red-500" colSpan={2}>Saída</th>
+              <th className="text-right px-2 py-2 font-bold text-slate-500" rowSpan={2}>Saldo Orçado</th>
+              <th className="text-right px-2 py-2 font-bold text-blue-600" rowSpan={2}>Saldo Real</th>
+            </tr>
+            <tr>
+              <th className="text-right px-2 py-1 font-semibold text-emerald-600">Orçado</th>
+              <th className="text-right px-2 py-1 font-semibold text-emerald-600">Realizado</th>
+              <th className="text-right px-2 py-1 font-semibold text-red-500">Orçado</th>
+              <th className="text-right px-2 py-1 font-semibold text-red-500">Realizado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {linhas.map((l) => {
+              const saldoReal = l.entradaReal != null && l.saidaReal != null ? l.entradaReal - l.saidaReal : null;
+              const saidaEstourouMes = (l.saidaReal ?? 0) > l.saidaPrevisto;
+              return (
+                <tr key={l.mes} className="border-t border-slate-50">
+                  <td className="px-2 py-1.5 font-semibold text-slate-700">{l.mes}ºM</td>
+                  <td className="px-2 py-1.5 text-right text-slate-500">{l.pctAcumulado}%</td>
+                  <td className="px-2 py-1.5 text-right text-slate-700">{fmtBRL(l.entradaPrevisto)}</td>
+                  <td className="px-2 py-1.5 text-right text-slate-700">{l.entradaReal != null ? fmtBRL(l.entradaReal) : "—"}</td>
+                  <td className="px-2 py-1.5 text-right text-slate-700">{fmtBRL(l.saidaPrevisto)}</td>
+                  <td className="px-2 py-1.5 text-right font-semibold" style={{ color: saidaEstourouMes ? "#DC2626" : "#334155" }}>
+                    {l.saidaReal != null ? fmtBRL(l.saidaReal) : "—"}
+                  </td>
+                  <td className="px-2 py-1.5 text-right font-semibold">{fmtBRL(l.saldoPrevisto)}</td>
+                  <td className="px-2 py-1.5 text-right font-bold text-blue-600">{saldoReal != null ? fmtBRL(saldoReal) : "—"}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Recebimentos por Obra (repasse real de medição / recursos próprios) ────── */
+function AbaRecebimentosObra({ obra, recebimentos, loading, onRecebimentoCriado, onLancamentoCriado }: {
+  obra: Obra;
+  recebimentos: Recebimento[];
+  loading: boolean;
+  onRecebimentoCriado: (r: Recebimento) => void;
+  onLancamentoCriado: (l: Lancamento) => void;
+}) {
+  const [expandido, setExpandido] = useState<string | null>(null);
+  const [modalRegistro, setModalRegistro] = useState<{
+    origemTipo: OrigemRecebimento; medicaoId: string | null; descricaoBase: string; saldoSugerido: number;
+  } | null>(null);
+
+  if (loading) return <p className="text-center text-slate-400 py-8 text-[13px]">Carregando...</p>;
+
+  const recebidoPorMedicao = (medicaoId: string) =>
+    recebimentos.filter((r) => r.medicao_id === medicaoId).reduce((s, r) => s + r.valor, 0);
+  const recebidoRecursosProprios = recebimentos
+    .filter((r) => r.origem_tipo === "recursos_proprios")
+    .reduce((s, r) => s + r.valor, 0);
+
+  const linhas = [
+    ...(obra.medicoes ?? [])
+      .filter((m) => (m.valor_liberado ?? 0) > 0)
+      .map((m) => ({
+        chave: `medicao:${m.id}`,
+        titulo: m.nome,
+        origemTipo: "medicao" as const,
+        medicaoId: m.id as string | null,
+        meta: m.valor_liberado ?? 0,
+        recebido: recebidoPorMedicao(m.id),
+      })),
+    ...(obra.recursos_proprios && obra.recursos_proprios > 0
+      ? [{
+          chave: "recursos_proprios",
+          titulo: "Recursos Próprios",
+          origemTipo: "recursos_proprios" as const,
+          medicaoId: null as string | null,
+          meta: obra.recursos_proprios,
+          recebido: recebidoRecursosProprios,
+        }]
+      : []),
+  ];
+
+  if (linhas.length === 0) {
+    return (
+      <p className="text-center text-slate-400 py-8 text-[13px]">
+        Nenhuma medição liberada ou Recursos Próprios cadastrados ainda pra essa obra.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {linhas.map((l) => {
+        const saldo = l.meta - l.recebido;
+        const status = saldo <= 0.01 ? "Concluído" : l.recebido > 0 ? "Repasse parcial" : "Aguardando repasse";
+        const cor = saldo <= 0.01 ? "#10B981" : l.recebido > 0 ? "#F59E0B" : "#94A3B8";
+        const repasses = recebimentos.filter((r) =>
+          l.origemTipo === "medicao" ? r.medicao_id === l.medicaoId : r.origem_tipo === "recursos_proprios"
+        );
+        const aberto = expandido === l.chave;
+
+        return (
+          <div key={l.chave} className="rounded-xl border border-slate-100 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[13px] font-bold text-slate-800 truncate">{l.titulo}</p>
+                <button
+                  onClick={() => setExpandido(aberto ? null : l.chave)}
+                  className="text-[10px] text-blue-500 hover:underline"
+                >
+                  {repasses.length} repasse{repasses.length !== 1 ? "s" : ""} {aberto ? "▲" : "▼"}
+                </button>
+              </div>
+              <span className="text-[9px] font-bold px-2 py-0.5 rounded-full text-white flex-shrink-0" style={{ background: cor }}>
+                {status}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-1.5 mt-2 text-center">
+              <div className="bg-slate-50 rounded-lg p-1.5">
+                <p className="text-[9px] text-slate-400 font-bold uppercase">Liberado</p>
+                <p className="text-[12px] font-bold text-slate-700">{fmtBRL(l.meta)}</p>
+              </div>
+              <div className="bg-emerald-50 rounded-lg p-1.5">
+                <p className="text-[9px] text-emerald-600 font-bold uppercase">Recebido</p>
+                <p className="text-[12px] font-bold text-emerald-700">{fmtBRL(l.recebido)}</p>
+              </div>
+              <div className={`rounded-lg p-1.5 ${saldo > 0.01 ? "bg-amber-50" : "bg-slate-50"}`}>
+                <p className="text-[9px] font-bold uppercase" style={{ color: saldo > 0.01 ? "#D97706" : "#94A3B8" }}>Saldo</p>
+                <p className="text-[12px] font-bold" style={{ color: saldo > 0.01 ? "#B45309" : "#94A3B8" }}>{fmtBRL(saldo)}</p>
+              </div>
+            </div>
+
+            {aberto && repasses.length > 0 && (
+              <div className="mt-2 space-y-1 border-t border-slate-100 pt-2">
+                {repasses.map((r) => (
+                  <div key={r.id} className="flex items-center justify-between text-[11px] text-slate-500">
+                    <span>{fmtDate(r.data)}{r.forma_pagamento ? ` · ${r.forma_pagamento}` : ""}</span>
+                    <span className="font-bold text-slate-700">{fmtBRL(r.valor)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {saldo > 0.01 && (
+              <button
+                onClick={() => setModalRegistro({
+                  origemTipo: l.origemTipo, medicaoId: l.medicaoId,
+                  descricaoBase: `Repasse ${l.titulo}`, saldoSugerido: saldo,
+                })}
+                className="mt-2 w-full text-[11px] font-bold text-blue-600 hover:bg-blue-50 rounded-lg py-1.5 transition-colors"
+              >
+                + Registrar Recebimento
+              </button>
+            )}
+          </div>
+        );
+      })}
+
+      {modalRegistro && (
+        <ModalRegistrarRecebimento
+          obra={obra}
+          origemTipo={modalRegistro.origemTipo}
+          medicaoId={modalRegistro.medicaoId}
+          descricaoBase={modalRegistro.descricaoBase}
+          saldoSugerido={modalRegistro.saldoSugerido}
+          onClose={() => setModalRegistro(null)}
+          onSaved={(recebimento, lancamento) => {
+            onRecebimentoCriado(recebimento);
+            onLancamentoCriado(lancamento);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ─── Sub-modal: Registrar Recebimento ───────────────────────────────────────── */
+function ModalRegistrarRecebimento({
+  obra, origemTipo, medicaoId, descricaoBase, saldoSugerido, onClose, onSaved,
+}: {
+  obra: Obra;
+  origemTipo: OrigemRecebimento;
+  medicaoId: string | null;
+  descricaoBase: string;
+  saldoSugerido: number;
+  onClose: () => void;
+  onSaved: (r: Recebimento, l: Lancamento) => void;
+}) {
+  const [valor, setValor] = useState<number | undefined>(saldoSugerido > 0 ? saldoSugerido : undefined);
+  const [data, setData] = useState(new Date().toISOString().slice(0, 10));
+  const [formaPagamento, setFormaPagamento] = useState("");
+  const [obs, setObs] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (!valor || valor <= 0) { toast.error("Informe o valor recebido"); return; }
+    setSaving(true);
+    try {
+      const { recebimento, lancamento } = await createRecebimento({
+        obra_id: obra.id,
+        origem_tipo: origemTipo,
+        medicao_id: medicaoId,
+        valor,
+        data,
+        descricao: `${descricaoBase} — ${obra.cliente ?? obra.nome ?? ""}`,
+        forma_pagamento: formaPagamento || null,
+        obs: obs || null,
+      });
+      toast.success("Recebimento registrado!");
+      onSaved(recebimento, lancamento);
+      onClose();
+    } catch {
+      toast.error("Erro ao registrar recebimento");
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <Modal onClose={onClose} size="sm" zIndex={1100}>
+      <ModalHeader title="Registrar Recebimento" subtitle={descricaoBase} onClose={onClose} />
+      <div className="p-5 space-y-3">
+        <div>
+          <label className="field-label">Valor Recebido (R$)</label>
+          <CurrencyInput value={valor} onChange={setValor} />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="field-label">Data</label>
+            <input type="date" value={data} onChange={(e) => setData(e.target.value)} className="input-base" />
+          </div>
+          <div>
+            <label className="field-label">Forma de Pagamento</label>
+            <select value={formaPagamento} onChange={(e) => setFormaPagamento(e.target.value)} className="input-base">
+              <option value="">Selecione</option>
+              {FORMAS_PAGAMENTO.map((f) => <option key={f}>{f}</option>)}
+            </select>
+          </div>
+        </div>
+        <div>
+          <label className="field-label">Observações</label>
+          <input value={obs} onChange={(e) => setObs(e.target.value)} className="input-base" placeholder="Opcional" />
+        </div>
+        <Button variant="primary" className="w-full" loading={saving} onClick={handleSave}>Registrar</Button>
+      </div>
+    </Modal>
+  );
+}
+
 /* ─── Tab Por Obra ───────────────────────────────────────────────────────────── */
-function TabPorObra({ lancamentos, obras }: { lancamentos: Lancamento[]; obras: Obra[] }) {
+function TabPorObra({ lancamentos, obras, onLancamentoCriado, initialObraId, initialSubTab }: {
+  lancamentos: Lancamento[]; obras: Obra[]; onLancamentoCriado: (l: Lancamento) => void;
+  initialObraId?: string; initialSubTab?: string;
+}) {
   const [obraModal, setObraModal] = useState<Obra | null>(null);
+  const [busca, setBusca] = useState("");
+  const obrasFiltradas = obras.filter((o) => (o.cliente ?? o.nome ?? "").toLowerCase().includes(busca.toLowerCase()));
+
+  // Veio de um link de alerta (ex: /financeiro?obra=xxx&aba=recebimentos) —
+  // abre direto a obra certa na aba certa assim que a lista carregar.
+  const [linkConsumido, setLinkConsumido] = useState(false);
+  useEffect(() => {
+    if (linkConsumido || !initialObraId || obras.length === 0) return;
+    const obra = obras.find((o) => o.id === initialObraId);
+    if (obra) setObraModal(obra);
+    setLinkConsumido(true);
+  }, [initialObraId, obras, linkConsumido]);
 
   return (
     <>
+      <input
+        value={busca}
+        onChange={(e) => setBusca(e.target.value)}
+        placeholder="Buscar cliente..."
+        className="border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 outline-none focus:border-blue-400 w-64 mb-3.5"
+      />
       <div className="grid grid-cols-3 gap-3.5">
-        {obras.map((obra) => {
+        {obrasFiltradas.map((obra) => {
           const ls    = lancamentos.filter((l) => l.obra_id === obra.id);
           const ent   = ls.filter((l) => l.tipo === "entrada").reduce((s, l) => s + l.valor, 0);
           const sai   = ls.filter((l) => l.tipo === "saida").reduce((s, l) => s + l.valor, 0);
@@ -1516,9 +2126,9 @@ function TabPorObra({ lancamentos, obras }: { lancamentos: Lancamento[]; obras: 
             </button>
           );
         })}
-        {obras.length === 0 && (
+        {obrasFiltradas.length === 0 && (
           <div className="col-span-3 card p-10 text-center text-slate-400 text-[13px]">
-            Nenhuma obra cadastrada.
+            {obras.length === 0 ? "Nenhuma obra cadastrada." : "Nenhuma obra encontrada."}
           </div>
         )}
       </div>
@@ -1528,6 +2138,8 @@ function TabPorObra({ lancamentos, obras }: { lancamentos: Lancamento[]; obras: 
           obra={obraModal}
           lancamentos={lancamentos}
           onClose={() => setObraModal(null)}
+          onLancamentoCriado={onLancamentoCriado}
+          initialSubTab={obraModal.id === initialObraId ? initialSubTab : undefined}
         />
       )}
     </>
@@ -1536,9 +2148,12 @@ function TabPorObra({ lancamentos, obras }: { lancamentos: Lancamento[]; obras: 
 
 /* ─── SetorFinanceiro (main) ─────────────────────────────────────────────────── */
 export default function SetorFinanceiro() {
-  const { lancamentos, loading, criar, criarVarios, editar, pagar, remover } = useFinanceiro();
+  const { lancamentos, loading, criar, criarVarios, editar, pagar, remover, adicionarLocal } = useFinanceiro();
   const { pode } = usePermissoes();
-  const [tab, setTab]         = useState<FinTab>("dashboard");
+  const searchParams = useSearchParams();
+  const obraParam = searchParams.get("obra");
+  const abaParam = searchParams.get("aba");
+  const [tab, setTab]         = useState<FinTab>(obraParam ? "por_obra" : "dashboard");
   const [obras, setObras]     = useState<Obra[]>([]);
   const [showModal, setShowModal]   = useState(false);
   const [editLanc, setEditLanc]     = useState<Lancamento | null>(null);
@@ -1623,7 +2238,15 @@ export default function SetorFinanceiro() {
                 onPagar={pagar}
               />
             )}
-            {tab === "por_obra" && <TabPorObra lancamentos={lancamentos} obras={obras} />}
+            {tab === "por_obra" && (
+              <TabPorObra
+                lancamentos={lancamentos}
+                obras={obras}
+                onLancamentoCriado={adicionarLocal}
+                initialObraId={obraParam ?? undefined}
+                initialSubTab={abaParam ?? undefined}
+              />
+            )}
           </>
         )}
       </div>

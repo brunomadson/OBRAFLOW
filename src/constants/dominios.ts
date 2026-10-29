@@ -17,11 +17,12 @@ export const SETORES_ACESSO = [
 ];
 
 export const SETORES_NAV = [
-  { id: "comercial",     label: "Comercial",     desc: "Leads & Propostas", emoji: "💼", cor: "#3B82F6" },
-  { id: "obras",         label: "Obras",         desc: "Projetos em andamento", emoji: "🏗", cor: "#10B981" },
-  { id: "financeiro",    label: "Financeiro",    desc: "Lançamentos", emoji: "💰", cor: "#F59E0B" },
-  { id: "notificacoes",  label: "Alertas",       desc: "Prazos & Vencimentos", emoji: "🔔", cor: "#EF4444" },
-  { id: "configuracoes", label: "Configurações", desc: "Prazos & Equipe", emoji: "⚙",  cor: "#8B5CF6" },
+  { id: "comercial",          label: "Comercial",          desc: "Leads & Propostas", emoji: "💼", cor: "#3B82F6" },
+  { id: "obras",               label: "Obras",              desc: "Projetos em andamento", emoji: "🏗", cor: "#10B981" },
+  { id: "financeiro",          label: "Financeiro",         desc: "Lançamentos", emoji: "💰", cor: "#F59E0B" },
+  { id: "notificacoes",        label: "Alertas",            desc: "Prazos & Vencimentos", emoji: "🔔", cor: "#EF4444" },
+  { id: "servicos-tecnicos",   label: "Serviços Técnicos",  desc: "Projetos & Consultoria", emoji: "🛠", cor: "#EC4899" },
+  { id: "configuracoes",       label: "Configurações",      desc: "Prazos & Equipe", emoji: "⚙",  cor: "#8B5CF6" },
 ];
 
 export const ORIGENS = [

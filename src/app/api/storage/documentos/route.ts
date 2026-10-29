@@ -20,17 +20,18 @@ export async function POST(req: NextRequest) {
   const file = form.get("file");
   const leadId = form.get("lead_id")?.toString() || null;
   const obraId = form.get("obra_id")?.toString() || null;
+  const servicoId = form.get("servico_id")?.toString() || null;
   const secao = form.get("secao")?.toString();
   const tipoDoc = form.get("tipo_doc")?.toString();
 
-  if (!(file instanceof File) || !secao || !tipoDoc || (!leadId && !obraId)) {
-    return NextResponse.json({ error: "parâmetros ausentes (file, secao, tipo_doc, lead_id ou obra_id)" }, { status: 400 });
+  if (!(file instanceof File) || !secao || !tipoDoc || (!leadId && !obraId && !servicoId)) {
+    return NextResponse.json({ error: "parâmetros ausentes (file, secao, tipo_doc, lead_id, obra_id ou servico_id)" }, { status: 400 });
   }
 
   const supabase = await createSessionClient();
 
-  // Nome do cliente + cidade vêm do lead/obra — o client não manda (evita
-  // qualquer chance de nome de pasta divergir do cadastro real).
+  // Nome do cliente + cidade vêm do lead/obra/serviço — o client não manda
+  // (evita qualquer chance de nome de pasta divergir do cadastro real).
   let nomeCliente = "Cliente";
   let cidade: string | null = null;
   if (leadId) {
@@ -39,6 +40,9 @@ export async function POST(req: NextRequest) {
   } else if (obraId) {
     const { data: obra } = await supabase.from("obras").select("cliente, nome, cidade").eq("id", obraId).maybeSingle<{ cliente: string | null; nome: string | null; cidade: string | null }>();
     if (obra) { nomeCliente = obra.cliente ?? obra.nome ?? "Cliente"; cidade = obra.cidade; }
+  } else if (servicoId) {
+    const { data: servico } = await supabase.from("servicos").select("cliente:clientes(nome)").eq("id", servicoId).maybeSingle<{ cliente: { nome: string } | null }>();
+    if (servico?.cliente) nomeCliente = servico.cliente.nome;
   }
 
   const bytes = new Uint8Array(await file.arrayBuffer());
@@ -47,7 +51,7 @@ export async function POST(req: NextRequest) {
   try {
     resultado = await uploadDocumentoHibrido({
       workspaceId: ctx.workspaceId, userId: ctx.userId,
-      leadId, obraId, secao, tipoDoc, nomeCliente, cidade,
+      leadId, obraId, servicoId, secao, tipoDoc, nomeCliente, cidade,
       nomeOriginal: file.name, mimeType: file.type || "application/octet-stream", bytes,
     });
   } catch (e) {
@@ -58,7 +62,7 @@ export async function POST(req: NextRequest) {
   const { data: documento, error: docErr } = await supabase
     .from("documentos")
     .insert({
-      lead_id: leadId, obra_id: obraId, secao, tipo_doc: tipoDoc,
+      lead_id: leadId, obra_id: obraId, servico_id: servicoId, secao, tipo_doc: tipoDoc,
       nome_arquivo: resultado.syncRow?.nome_padronizado ?? file.name,
       tamanho_bytes: file.size, mime_type: file.type || null,
       storage_path: resultado.storagePath, usuario_id: ctx.userId,

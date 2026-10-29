@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { SETORES_NAV } from "@/constants/dominios";
+import type { StatusPagamento } from "@/types/app.types";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -80,6 +81,23 @@ export function nowBR(): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+// ─── Financeiro (lançamentos) ─────────────────────────────────────────────────
+// "vencido" nunca é gravado no banco — é sempre derivado na hora (status_pagamento
+// só tem pendente/pago de verdade) comparando data_vencimento com hoje. Usado
+// tanto no Financeiro de Obras quanto no de Serviços Técnicos — mesma regra,
+// nunca duas implementações que podem divergir.
+export function diasAteVencer(dataVencimento: string | null): number | null {
+  if (!dataVencimento) return null;
+  return Math.ceil((new Date(dataVencimento + "T00:00:00").getTime() - Date.now()) / 86_400_000);
+}
+
+export function statusReal(l: { status_pagamento: StatusPagamento; data_vencimento: string | null }): StatusPagamento {
+  if (l.status_pagamento === "pago") return "pago";
+  const dias = diasAteVencer(l.data_vencimento);
+  if (dias !== null && dias < 0) return "vencido";
+  return "pendente";
 }
 
 // ─── Parsing ──────────────────────────────────────────────────────────────────

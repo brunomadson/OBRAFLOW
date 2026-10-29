@@ -1,7 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient as createSessionClient } from "@/lib/supabase/server";
 import { getValidAccessToken, uploadDriveFile, downloadDriveFile, deleteDriveFile } from "@/services/integrations/google-drive/google-drive.service";
-import { ensureClientFolder, ensureObraPuraFolder, resolveSubpastaChave, getFolderExternalId } from "./folderStructure";
+import { ensureClientFolder, ensureObraPuraFolder, ensureServicoFolder, resolveSubpastaChave, getFolderExternalId } from "./folderStructure";
 import { gerarNomePadronizado } from "./documentNaming.service";
 import type { IntegrationContext } from "@/services/integrations/core/integration-types";
 
@@ -21,6 +21,7 @@ interface UploadParams {
   userId: string;
   leadId: string | null;
   obraId: string | null;
+  servicoId: string | null;
   secao: string;
   tipoDoc: string;
   nomeCliente: string;
@@ -56,7 +57,7 @@ export async function uploadDocumentoHibrido(params: UploadParams): Promise<Uplo
   const provider = workspace?.storage_provider ?? "supabase";
 
   const nomePadronizado = gerarNomePadronizado({ tipoDoc: params.tipoDoc, nomeCliente: params.nomeCliente, cidade: params.cidade, nomeOriginal: params.nomeOriginal });
-  const ownerId = params.leadId ?? params.obraId ?? "sem-id";
+  const ownerId = params.leadId ?? params.obraId ?? params.servicoId ?? "sem-id";
   const pathFallback = `${ownerId}/${params.secao}/${Date.now()}_${nomePadronizado}`;
 
   if (provider === "supabase") {
@@ -87,9 +88,11 @@ export async function uploadDocumentoHibrido(params: UploadParams): Promise<Uplo
       await ensureClientFolder(ctx, accessToken, params.leadId, params.nomeCliente, params.cidade);
     } else if (params.obraId) {
       await ensureObraPuraFolder(ctx, accessToken, params.obraId, params.nomeCliente, params.cidade);
+    } else if (params.servicoId) {
+      await ensureServicoFolder(ctx, accessToken, params.servicoId, params.nomeCliente);
     }
 
-    const chavePasta = resolveSubpastaChave({ leadId: params.leadId, obraId: params.obraId }, params.secao);
+    const chavePasta = resolveSubpastaChave({ leadId: params.leadId, obraId: params.obraId, servicoId: params.servicoId }, params.secao);
     const folderId = await getFolderExternalId(params.workspaceId, chavePasta);
     if (!folderId) throw new Error(`Pasta "${chavePasta}" não foi encontrada/criada — não é possível enviar o arquivo.`);
 
@@ -193,9 +196,9 @@ export async function promoverPendentes(ctx: IntegrationContext, maxPorVez = 5):
   for (const p of pendentes) {
     const { data: doc } = await admin
       .from("documentos")
-      .select("lead_id, obra_id, secao, storage_path, mime_type, ativo")
+      .select("lead_id, obra_id, servico_id, secao, storage_path, mime_type, ativo")
       .eq("id", p.documento_id)
-      .maybeSingle<{ lead_id: string | null; obra_id: string | null; secao: string; storage_path: string; mime_type: string | null; ativo: boolean }>();
+      .maybeSingle<{ lead_id: string | null; obra_id: string | null; servico_id: string | null; secao: string; storage_path: string; mime_type: string | null; ativo: boolean }>();
     // documento não existe mais, ou foi excluído (soft-delete) — não
     // promove um arquivo que o usuário já apagou.
     if (!doc || doc.ativo === false) {
@@ -203,7 +206,7 @@ export async function promoverPendentes(ctx: IntegrationContext, maxPorVez = 5):
       continue;
     }
 
-    const chavePasta = resolveSubpastaChave({ leadId: doc.lead_id, obraId: doc.obra_id }, doc.secao);
+    const chavePasta = resolveSubpastaChave({ leadId: doc.lead_id, obraId: doc.obra_id, servicoId: doc.servico_id }, doc.secao);
     const folderId = await getFolderExternalId(ctx.workspaceId, chavePasta);
     if (!folderId) continue; // pasta ainda não existe (raro) — tenta de novo na próxima promoção
 

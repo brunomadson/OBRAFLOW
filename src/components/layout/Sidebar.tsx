@@ -7,9 +7,11 @@ import { cn } from "@/lib/utils";
 
 interface Props {
   notifCount: number;
+  open: boolean;
+  onClose: () => void;
 }
 
-export default function Sidebar({ notifCount }: Props) {
+export default function Sidebar({ notifCount, open, onClose }: Props) {
   const pathname = usePathname();
   const { profile, signOut } = useAuth();
 
@@ -18,7 +20,22 @@ export default function Sidebar({ notifCount }: Props) {
   const setoresVisiveis = SETORES_NAV.filter((s) => setoresUser.includes(s.id));
 
   return (
-    <aside className="fixed top-0 left-0 bottom-0 w-[200px] bg-slate-950 flex flex-col z-[100]">
+    <>
+      {/* Fundo escurecido — só no mobile, quando o menu está aberto */}
+      {open && (
+        <div
+          onClick={onClose}
+          className="fixed inset-0 bg-black/50 z-[99] md:hidden"
+        />
+      )}
+
+      <aside
+        className={cn(
+          "fixed top-0 left-0 bottom-0 w-[200px] bg-slate-950 flex flex-col z-[100]",
+          "transition-transform duration-200 md:translate-x-0",
+          open ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
       {/* Logo */}
       <div className="px-5 py-5 border-b border-slate-800">
         <div className="flex items-center gap-2.5">
@@ -37,6 +54,7 @@ export default function Sidebar({ notifCount }: Props) {
             <Link
               key={s.id}
               href={`/${s.id}`}
+              onClick={onClose}
               className={cn(
                 "sidebar-item relative",
                 isActive ? "active" : "hover:bg-slate-900"
@@ -97,6 +115,7 @@ export default function Sidebar({ notifCount }: Props) {
           Sair
         </button>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

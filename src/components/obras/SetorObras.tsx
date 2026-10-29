@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { useObras } from "@/hooks/useObras";
 import { usePermissoes } from "@/hooks/usePermissoes";
 import DashboardObras from "./DashboardObras";
@@ -12,13 +13,23 @@ import type { EtapaObra } from "@/types/app.types";
 type Aba = "dashboard" | "obras" | "medicoes";
 
 export default function SetorObras() {
-  const { obras, loading, salvar, avancarEtapa, salvarMedicao, removerMedicao } = useObras();
+  const { obras, loading, salvar, avancarEtapa, excluir, salvarMedicao, removerMedicao } = useObras();
   const { pode } = usePermissoes();
+  const searchParams = useSearchParams();
+  const obraParam = searchParams.get("obra");
   const [aba, setAba]     = useState<Aba>("dashboard");
   const [busca, setBusca] = useState("");
 
   // Armazena só o ID para que o modal sempre reflita o estado atual das obras
   const [modalObraId, setModalObraId] = useState<string | "nova" | null>(null);
+
+  // Veio de um link de alerta (ex: /obras?obra=xxx) — abre direto a obra.
+  const [linkConsumido, setLinkConsumido] = useState(false);
+  useEffect(() => {
+    if (linkConsumido || !obraParam || obras.length === 0) return;
+    if (obras.some((o) => o.id === obraParam)) setModalObraId(obraParam);
+    setLinkConsumido(true);
+  }, [obraParam, obras, linkConsumido]);
 
   const modalObra = modalObraId === null
     ? null
@@ -87,6 +98,10 @@ export default function SetorObras() {
           onAvancar={async (id: string, novaEtapa: EtapaObra) => {
             const obraObj = obras.find((o) => o.id === id);
             if (obraObj) await avancarEtapa(obraObj, novaEtapa);
+          }}
+          onExcluir={async (id: string) => {
+            const obraObj = obras.find((o) => o.id === id);
+            return obraObj ? excluir(obraObj) : false;
           }}
           onSalvarMedicao={async (obraId, data) => { await salvarMedicao(obraId, data); }}
           onRemoverMedicao={removerMedicao}

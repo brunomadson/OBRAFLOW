@@ -288,6 +288,7 @@ export default function ChecklistDocumentosObra({ obra, onSave, onAvancar }: Pro
     contrato:  "Contrato",
     execucao:  "Execução",
     entregue:  "Entregue",
+    stand_by:  "Stand By",
   };
   return (
     <div className="text-center py-12 text-slate-400">

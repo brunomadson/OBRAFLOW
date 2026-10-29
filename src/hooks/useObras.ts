@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { getObras, createObra, updateObra, registrarLogObra, upsertMedicao, deleteMedicao, ordenarPorNome } from "@/services/obras.service";
+import { getObras, createObra, updateObra, deleteObra, registrarLogObra, upsertMedicao, deleteMedicao, ordenarPorNome } from "@/services/obras.service";
 import { registrarHistorico } from "@/services/historico.service";
 import { useAuth } from "@/contexts/AuthContext";
 import { ETAPAS_OBRA } from "@/constants/etapas";
@@ -78,16 +78,37 @@ export function useObras() {
       );
       const acaoText = `moveu o cliente de "${labelEtapaObra(etapaAnterior)}" para "${labelEtapaObra(novaEtapa)}".`;
       await registrarHistorico({
-        obra_id: obra.id, lead_id: obra.lead_id,
+        obra_id: obra.id, lead_id: obra.lead_id, servico_id: null,
         tipo: "obras", acao: acaoText,
         usuario_nome: nomeUsuario, usuario_id: null, setor: "obras", etapa: novaEtapa,
       }).catch(() => {});
-      dispararMovimentoPastaObra(obra.id, etapaAnterior, novaEtapa);
-      toast.success(`Obra avançada para ${novaEtapa}`);
+      // Stand By é pausa, não mudança de fase — a pasta do Drive fica onde está.
+      if (novaEtapa !== "stand_by" && etapaAnterior !== "stand_by") {
+        dispararMovimentoPastaObra(obra.id, etapaAnterior, novaEtapa);
+      }
+      toast.success(
+        novaEtapa === "stand_by"
+          ? "Obra colocada em Stand By"
+          : etapaAnterior === "stand_by"
+            ? `Obra retomada em ${labelEtapaObra(novaEtapa)}`
+            : `Obra avançada para ${labelEtapaObra(novaEtapa)}`
+      );
     } catch {
-      toast.error("Erro ao avançar etapa");
+      toast.error("Erro ao alterar etapa");
     }
   }, [nomeUsuario]);
+
+  const excluir = useCallback(async (obra: Obra): Promise<boolean> => {
+    try {
+      await deleteObra(obra.id);
+      setObras((prev) => prev.filter((o) => o.id !== obra.id));
+      toast.success("Obra apagada");
+      return true;
+    } catch (err) {
+      toast.error((err as { message?: string })?.message || "Erro ao apagar obra");
+      return false;
+    }
+  }, []);
 
   const salvarMedicao = useCallback(async (obraId: string, medicao: Partial<Medicao>): Promise<Medicao | null> => {
     const isNova = !medicao.id;
@@ -114,7 +135,7 @@ export function useObras() {
 
       if (isNova) {
         await registrarHistorico({
-          obra_id: obraId, lead_id: obra?.lead_id ?? null,
+          obra_id: obraId, lead_id: obra?.lead_id ?? null, servico_id: null,
           tipo: "medicao", acao: `criou a Medição "${nomeMed}".`,
           usuario_nome: nomeUsuario, usuario_id: null, setor: "obras", etapa: obra?.etapa ?? null,
         }).catch(() => {});
@@ -124,14 +145,14 @@ export function useObras() {
           const labelAntigo = STATUS_MEDICAO_LABEL[statusAntigo ?? ""] ?? statusAntigo ?? "—";
           const labelNovo = STATUS_MEDICAO_LABEL[medicao.status] ?? medicao.status;
           await registrarHistorico({
-            obra_id: obraId, lead_id: obra?.lead_id ?? null,
+            obra_id: obraId, lead_id: obra?.lead_id ?? null, servico_id: null,
             tipo: "medicao",
             acao: `alterou o status da Medição "${nomeMed}" de "${labelAntigo}" para "${labelNovo}".`,
             usuario_nome: nomeUsuario, usuario_id: null, setor: "obras", etapa: obra?.etapa ?? null,
           }).catch(() => {});
         } else {
           await registrarHistorico({
-            obra_id: obraId, lead_id: obra?.lead_id ?? null,
+            obra_id: obraId, lead_id: obra?.lead_id ?? null, servico_id: null,
             tipo: "medicao", acao: `atualizou os dados da Medição "${nomeMed}".`,
             usuario_nome: nomeUsuario, usuario_id: null, setor: "obras", etapa: obra?.etapa ?? null,
           }).catch(() => {});
@@ -159,7 +180,7 @@ export function useObras() {
         )
       );
       await registrarHistorico({
-        obra_id: obraId, lead_id: obra?.lead_id ?? null,
+        obra_id: obraId, lead_id: obra?.lead_id ?? null, servico_id: null,
         tipo: "medicao", acao: `removeu a Medição "${medicao?.nome ?? "Medição"}".`,
         usuario_nome: nomeUsuario, usuario_id: null, setor: "obras", etapa: obra?.etapa ?? null,
       }).catch(() => {});
@@ -169,5 +190,5 @@ export function useObras() {
     }
   }, [obras, nomeUsuario]);
 
-  return { obras, loading, salvar, avancarEtapa, salvarMedicao, removerMedicao, reload: load };
+  return { obras, loading, salvar, avancarEtapa, excluir, salvarMedicao, removerMedicao, reload: load };
 }

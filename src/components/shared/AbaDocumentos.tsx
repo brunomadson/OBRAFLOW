@@ -54,7 +54,8 @@ const ORDEM: EtapaObra[] = [
 ];
 
 function gte(atual: EtapaObra | undefined, minima: EtapaObra): boolean {
-  if (!atual) return false;
+  // Stand By não está na ORDEM (indexOf = -1) — trata como "ainda não avançou".
+  if (!atual || !ORDEM.includes(atual)) return false;
   return ORDEM.indexOf(atual) >= ORDEM.indexOf(minima);
 }
 
@@ -302,7 +303,7 @@ function DocTypeRow({
         });
         onUploaded(novo);
         await registrarHistorico({
-          lead_id: leadId ?? null, obra_id: obraId ?? null,
+          lead_id: leadId ?? null, obra_id: obraId ?? null, servico_id: null,
           tipo: "documento", acao: `anexou o documento "${tipo.label}".`,
           usuario_nome: nomeUsuario, usuario_id: null,
           setor: obraId ? "obras" : "comercial", etapa: null,
@@ -321,7 +322,7 @@ function DocTypeRow({
     await deleteDocumento(doc);
     onDeleted(doc.id);
     await registrarHistorico({
-      lead_id: leadId ?? null, obra_id: obraId ?? null,
+      lead_id: leadId ?? null, obra_id: obraId ?? null, servico_id: null,
       tipo: "documento", acao: `removeu o documento "${tipo.label}".`,
       usuario_nome: nomeUsuario, usuario_id: null,
       setor: obraId ? "obras" : "comercial", etapa: null,

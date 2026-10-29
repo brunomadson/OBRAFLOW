@@ -65,11 +65,41 @@ export async function updateObra(id: string, payload: Partial<Obra>): Promise<Ob
   return data as unknown as Obra;
 }
 
+// Apaga a obra. obra_log, medicoes, historico, documentos e recebimentos saem
+// em cascata, mas lancamentos.obra_id não tem ON DELETE — então bloqueia com
+// mensagem clara em vez de deixar estourar erro de FK (ou apagar o financeiro
+// sem querer).
+export async function deleteObra(id: string): Promise<void> {
+  const { count, error: errCount } = await supabase
+    .from("lancamentos")
+    .select("id", { count: "exact", head: true })
+    .eq("obra_id", id);
+  if (errCount) throw errCount;
+  if (count && count > 0) {
+    throw new Error(`Esta obra tem ${count} lançamento(s) no Financeiro. Remova ou desvincule esses lançamentos antes de apagar a obra.`);
+  }
+
+  const { error } = await supabase.from("obras").delete().eq("id", id);
+  if (error) throw error;
+}
+
 export async function registrarLogObra(obraId: string, etapa: string): Promise<void> {
   const { error } = await supabase
     .from("obra_log")
     .insert({ obra_id: obraId, etapa } as never);
   if (error) throw error;
+}
+
+// Histórico do Cliente (Sprint 13.1) — todas as obras já vinculadas a esse
+// cliente_id, independente da etapa.
+export async function getObrasPorCliente(clienteId: string): Promise<Obra[]> {
+  const { data, error } = await supabase
+    .from("obras")
+    .select("id, cliente, nome, etapa, created_at")
+    .eq("cliente_id", clienteId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as unknown as Obra[];
 }
 
 // ─── Medições ─────────────────────────────────────────────────────────────────

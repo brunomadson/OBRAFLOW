@@ -2,7 +2,7 @@
 import { memo } from "react";
 import Badge from "@/components/ui/Badge";
 import ProgressBar from "@/components/ui/ProgressBar";
-import { ETAPAS_OBRA, FLUXO_OBRA } from "@/constants/etapas";
+import { ETAPAS_OBRA, etapaAntesDoStandBy } from "@/constants/etapas";
 import { fmtBRL, fmtDate } from "@/lib/utils";
 import type { Obra } from "@/types/app.types";
 
@@ -32,8 +32,10 @@ const COM_MURO_LABEL: Record<string, string> = {
 
 const CardObra = memo(function CardObra({ obra, onClick }: Props) {
   const etapa      = ETAPAS_OBRA.find((e) => e.id === obra.etapa);
-  const progresso  = ETAPA_PCT[obra.etapa] ?? 0;
-  const atrasada   = obra.prazo_conclusao && obra.etapa !== "entregue" && new Date(obra.prazo_conclusao) < new Date();
+  const emStandBy  = obra.etapa === "stand_by";
+  // Em Stand By o progresso congela na etapa em que a obra parou.
+  const progresso  = ETAPA_PCT[emStandBy ? (etapaAntesDoStandBy(obra.log) ?? "") : obra.etapa] ?? 0;
+  const atrasada   = obra.prazo_conclusao && obra.etapa !== "entregue" && !emStandBy && new Date(obra.prazo_conclusao) < new Date();
   const showDatas  = ETAPAS_POS_CONTRATO.has(obra.etapa);
 
   const medTotal = obra.medicoes?.length ?? 0;

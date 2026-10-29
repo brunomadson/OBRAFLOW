@@ -180,11 +180,12 @@ export default function DashboardObras({ obras }: Props) {
     const now = new Date();
 
     // Obras
-    const ativas    = obras.filter((o) => o.etapa !== "entregue");
+    // Stand By não conta como ativa, concluída nem atrasada — está pausada.
+    const ativas    = obras.filter((o) => o.etapa !== "entregue" && o.etapa !== "stand_by");
     const concl     = obras.filter((o) => o.etapa === "entregue");
     const atrasadas = obras.filter((o) => {
       const prazo = o.prazo_conclusao;
-      return prazo && o.etapa !== "entregue" && new Date(prazo) < now;
+      return prazo && o.etapa !== "entregue" && o.etapa !== "stand_by" && new Date(prazo) < now;
     });
 
     // Variação obras (criadas este mês vs mês passado)
@@ -217,7 +218,7 @@ export default function DashboardObras({ obras }: Props) {
         temposPorEtapa[etapa].push(dias);
       }
       // Etapa atual (em andamento)
-      if (obra.etapa !== "entregue") {
+      if (obra.etapa !== "entregue" && obra.etapa !== "stand_by") {
         const ultimo = sorted[sorted.length - 1];
         const diasOngoing = Math.round((Date.now() - new Date(ultimo.created_at).getTime()) / 86_400_000);
         const etapaAtual = obra.etapa;

@@ -7,6 +7,7 @@ import { getLeadsPorCliente } from "@/services/leads.service";
 import { getObrasPorCliente } from "@/services/obras.service";
 import { getServicosPorCliente } from "@/services/servicos.service";
 import { ETAPAS_LEAD, ETAPAS_OBRA, ETAPAS_SERVICO } from "@/constants/etapas";
+import { fmtDate } from "@/lib/utils";
 import type { Cliente } from "@/types/app.types";
 import toast from "react-hot-toast";
 
@@ -193,7 +194,7 @@ export default function ModalCliente({ cliente, onClose, onSave }: Props) {
                   <div className="min-w-0">
                     <p className="text-xs font-semibold text-slate-700 truncate">{m.nome}</p>
                     <p className="text-[10px] text-slate-400">
-                      {m.origem} · {new Date(m.data).toLocaleDateString("pt-BR")}
+                      {m.origem} · {fmtDate(m.data)}
                     </p>
                   </div>
                   <Badge color={m.etapaCor}>{m.etapaLabel}</Badge>

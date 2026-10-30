@@ -48,6 +48,12 @@ export function fmtBRL(value: number | null | undefined): string {
 export function fmtDate(date: Date | string | null | undefined): string {
   if (!date) return "";
   try {
+    // "YYYY-MM-DD" (coluna date do banco) é um dia de calendário, sem fuso.
+    // new Date() lê como meia-noite UTC e no Brasil (UTC-3) exibiria o dia anterior.
+    if (typeof date === "string") {
+      const m = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+    }
     const d = date instanceof Date ? date : new Date(date);
     if (isNaN(d.getTime())) return "";
     return d.toLocaleDateString("pt-BR");

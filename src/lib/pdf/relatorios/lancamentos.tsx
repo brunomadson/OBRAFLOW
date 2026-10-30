@@ -1,12 +1,13 @@
 import { View, Text } from "@react-pdf/renderer";
 import { RelatorioDocument, SecaoTitulo, KpiGrid, Kpi, CORES, type ContextoRelatorio } from "../RelatorioBase";
 import { styles } from "../theme";
-import { fmtBRL, fmtDate } from "@/lib/utils";
+import { fmtBRL, fmtDate, statusReal } from "@/lib/utils";
 import type { Lancamento, Obra } from "@/types/app.types";
 
 function statusLabel(l: Lancamento): string {
-  if (l.status_pagamento === "pago") return "Pago";
-  if (l.data_vencimento && new Date(l.data_vencimento) < new Date()) return "Vencido";
+  const status = statusReal(l);
+  if (status === "pago") return "Pago";
+  if (status === "vencido") return "Vencido";
   return "A vencer";
 }
 
